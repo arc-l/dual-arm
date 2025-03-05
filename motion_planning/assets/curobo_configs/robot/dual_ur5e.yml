@@ -1,0 +1,193 @@
+robot_cfg:
+  kinematics:
+    asset_root_path: robot/ur_description
+    base_link: base_fixture_link
+    collision_link_names:
+    - shoulder_link
+    - upper_arm_link
+    - forearm_link
+    - wrist_1_link
+    - wrist_2_link
+    - wrist_3_link
+    - tool0
+    - shoulder_link_1
+    - upper_arm_link_1
+    - forearm_link_1
+    - wrist_1_link_1
+    - wrist_2_link_1
+    - wrist_3_link_1
+    - tool1
+    collision_sphere_buffer: 0.0
+    collision_spheres: spheres/dual_ur5e.yml
+    cspace:
+      cspace_distance_weight:
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      joint_names:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+      - shoulder_pan_joint_1
+      - shoulder_lift_joint_1
+      - elbow_joint_1
+      - wrist_1_joint_1
+      - wrist_2_joint_1
+      - wrist_3_joint_1
+      max_acceleration: 1500.0
+      max_jerk: 50000.0
+      null_space_weight:
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      retract_config:
+      - 0.0
+      - -2.51327412
+      - 1.57079633
+      - -0.62831853
+      - -1.57079633
+      - 0.0
+      - -3.1415926
+      - -2.51327412
+      - 1.57079633
+      - -0.62831853
+      - -1.57079633
+      - 0.0
+      velocity_scale: 0.5
+    ee_link: tool0
+    isaac_usd_path: /Isaac/Robots/UR5/ur5_long_suction.usd
+    link_names:
+    - tool1
+    - tool0
+    lock_joints: {}
+    self_collision_buffer:
+      forearm_link: 0.05
+      forearm_link_1: 0.05
+      shoulder_link: 0.05
+      shoulder_link_1: 0.05
+      tool0: 0.05
+      tool1: 0.05
+      upper_arm_link: 0.05
+      upper_arm_link_1: 0.05
+      wrist_1_link: 0.05
+      wrist_1_link_1: 0.05
+      wrist_2_link: 0.05
+      wrist_2_link_1: 0.05
+      wrist_3_link: 0.05
+      wrist_3_link_1: 0.05
+    self_collision_ignore:
+      forearm_link:
+      - forearm_link
+      - upper_arm_link
+      - wrist_1_link
+      - wrist_2_link
+      - wrist_3_link
+      - tool0
+      forearm_link_1:
+      - shoulder_link_1
+      - upper_arm_link_1
+      - forearm_link_1
+      - wrist_1_link_1
+      - wrist_2_link_1
+      - wrist_3_link_1
+      - tool1
+      shoulder_link:
+      - forearm_link
+      - upper_arm_link
+      - wrist_1_link
+      - wrist_2_link
+      - wrist_3_link
+      - tool0
+      shoulder_link_1:
+      - shoulder_link_1
+      - upper_arm_link_1
+      - forearm_link_1
+      - wrist_1_link_1
+      - wrist_2_link_1
+      - wrist_3_link_1
+      - tool1
+      upper_arm_link:
+      - forearm_link
+      - upper_arm_link
+      - wrist_1_link
+      - wrist_2_link
+      - wrist_3_link
+      - tool0
+      upper_arm_link_1:
+      - shoulder_link_1
+      - upper_arm_link_1
+      - forearm_link_1
+      - wrist_1_link_1
+      - wrist_2_link_1
+      - wrist_3_link_1
+      - tool1
+      wrist_1_link:
+      - forearm_link
+      - upper_arm_link
+      - wrist_1_link
+      - wrist_2_link
+      - wrist_3_link
+      - tool0
+      wrist_1_link_1:
+      - shoulder_link_1
+      - upper_arm_link_1
+      - forearm_link_1
+      - wrist_1_link_1
+      - wrist_2_link_1
+      - wrist_3_link_1
+      - tool1
+      wrist_2_link:
+      - forearm_link
+      - upper_arm_link
+      - wrist_1_link
+      - wrist_2_link
+      - wrist_3_link
+      - tool0
+      wrist_2_link_1:
+      - shoulder_link_1
+      - upper_arm_link_1
+      - forearm_link_1
+      - wrist_1_link_1
+      - wrist_2_link_1
+      - wrist_3_link_1
+      - tool1
+      wrist_3_link:
+      - forearm_link
+      - upper_arm_link
+      - wrist_1_link
+      - wrist_2_link
+      - wrist_3_link
+      - tool0
+      wrist_3_link_1:
+      - shoulder_link_1
+      - upper_arm_link_1
+      - forearm_link_1
+      - wrist_1_link_1
+      - wrist_2_link_1
+      - wrist_3_link_1
+      - tool1
+    urdf_path: robot/ur_description/dual_ur5e.urdf
+    usd_path: robot/ur_description/dual_ur5e.usd
+    usd_robot_root: /ur5
+    use_usd_kinematics: false
