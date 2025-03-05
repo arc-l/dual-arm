@@ -33,9 +33,9 @@ def run_simulation(args):
 
     texts = [
         # '0.1 15 05 1.0 50 51'
-        '0.1 4 05 1.0 00 01'
+        # '0.1 4 05 1.0 00 01'
         # '0.1 6 05 1.0 00 01'
-        # '0.1 8 05 1.0 00 01'
+        '0.1 8 05 1.0 00 01'
         # '0.2 5 05 1.0 02 19',  # compact example
         # '0.2 05 00 0.5 02 19', # handoff example
         # '0.2 05 00 0.75 01 04', 
@@ -53,11 +53,10 @@ def run_simulation(args):
         radius = math.sqrt(Density * Width * Height / numObjs / math.pi)
         radius = min(0.036*1000/WORKSPACE_SIZE,radius) # the opened hand is 8.5cm, and give some margin
         time_step_size = 0.02 # 1/240.0
-        speed = 0.3141592653589793
-        # method = 'baseline_v2'
-        method = "baseline"
+        speed = 0.3141592653589793 * 5
+        method = 'baseline_v2'
+        # method = "baseline"
         # method = 'bato'
-        # method = 'cuto_v2'
 
         # overlap_rate = 0.3
         print("start_arr", start_arr)

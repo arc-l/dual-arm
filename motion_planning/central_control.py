@@ -4,6 +4,7 @@ import pybullet as pb
 import os
 import numpy as np
 import math
+import time
 import copy
 from copy import deepcopy
 from typing import Dict, List
@@ -37,7 +38,6 @@ class central_control(object):
         self.robot1_position = robot1_position
         self.overlap_rate = overlap_rate
         self.dual_action_list = dual_action_list
-        self.speed = speed
         self.control_mode = control_mode
         self.execution_time = 0
         self.num_conflicts = 0
@@ -101,6 +101,8 @@ class central_control(object):
     def reset_env(self):
         ''' reset Pybullet env '''
         self._pb.resetSimulation()
+        self._pb.setTimeStep(self.time_step)
+        print("time step", self.time_step)
         self._pb.setGravity(0, 0, -9.8)
 
         # # Temporarily disable rendering to load scene faster.
@@ -763,8 +765,10 @@ class central_control(object):
         #     self.stepSimulation()
 
 
-    def stepSimulation(self):
+    def stepSimulation(self, real_time=False):
         self._pb.stepSimulation()
+        if real_time:
+            time.sleep(self.time_step)
         self.execution_time += self.time_step
 
 
@@ -840,7 +844,7 @@ class central_control(object):
                     acceleration=dual_acceleration,
                     jerk=dual_jerk,
                 )
-                self.move_to_dual_state(dual_js)
+                self.move_to_dual_state(dual_js, real_time=True)
     
 
 
@@ -886,15 +890,15 @@ class central_control(object):
             self.recorder.add_new_step(arm_states)
         
     
-    def move_to_dual_state(self, dual_state):
+    def move_to_dual_state(self, dual_state, real_time=False):
         prev_dist = float('inf')
         for arm_id in range(2):
-            self.arms[arm_id].move_to_joint(dual_state[(arm_id*6):((arm_id+1)*6)])
+            self.arms[arm_id].move_to_joint(dual_state[(arm_id*6):((arm_id+1)*6)], speed=self.speed)
         
         target_dual_state = dual_state.position.cpu().numpy().reshape(-1)    
         while True:
             for _ in range(1):
-                self.stepSimulation()
+                self.stepSimulation(real_time=real_time)
             ''' check distance '''
             current_dual_state = np.concatenate([self.arms[arm_id].get_joint_state() for arm_id in range(2)], axis=-1).reshape(-1)
             distance = np.linalg.norm(current_dual_state-target_dual_state, ord=2)
