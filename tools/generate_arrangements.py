@@ -2,7 +2,6 @@ import math
 import numpy as np
 import random
 import copy
-from shapely.geometry import Polygon
 import math
 import json
 import random

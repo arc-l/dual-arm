@@ -1,7 +1,6 @@
 import numpy as np
 import math
 from dataclasses import dataclass
-from scipy.spatial.transform import Rotation as R
 import os
 
 # paths
@@ -27,9 +26,3 @@ REAL_CENTER = [-0.0362, -0.471]
 SIM_CENTER = [0.5, 0.0]
 PNP_ROT = [-0.5877976611933862, 0.8089882123010008, 0.005586555396007588,0.0008787789389623685] # quaternion
 # PNP_ROT = [7.07106781e-01, -7.07106781e-01, 4.32978028e-17, 4.32978028e-17]
-
-if __name__ == "__main__":
-    rot = R.from_quat(PNP_ROT)
-    print(rot.as_euler("XYZ", degrees=True))    
-    rot = R.from_euler("XYZ", [180, 0, 0], degrees=True)
-    print(rot.as_quat())

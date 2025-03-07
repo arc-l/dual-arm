@@ -1,6 +1,6 @@
 from numpy import array
 from numpy import average
-from numpy.lib.function_base import copy
+# from numpy.lib.function_base import copy
 from numpy.linalg import norm
 from random import choice, uniform
 from math import log1p, log10, sqrt

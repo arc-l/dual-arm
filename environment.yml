@@ -1,0 +1,17 @@
+name: dual_arm_tamp
+channels:
+    - conda-forge
+dependencies:
+    - python=3.10
+    - numpy=1.26.4
+    - matplotlib
+    - pip
+    - pip:
+        - pybullet
+        - timeout-decorator
+        - colorama
+        - ujson
+        - shapely
+        - toppra
+        - numpy-quaternion
+        - pyyaml

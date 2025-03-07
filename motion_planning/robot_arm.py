@@ -5,10 +5,9 @@ import os
 import time
 import math
 import pybullet as pb
-import torch
 from typing import List
 
-from curobo.types.robot import JointState
+# from curobo.types.robot import JointState
 
 from motion_planning.plan_recorder import Arm_State
 from constants import EPSILON
@@ -879,13 +878,13 @@ class robot_arm(object):
                 self._pb.getJointState(self.ur, i)[0] for i in self.ur_joints
             ])
     
-    def move_to_joint(self, joint_state:JointState, speed = None):
+    def move_to_joint(self, joint_state, speed = None):
         if speed is None:
             speed = self.speed
-        if type(joint_state) != JointState:
-            joint_state = JointState.from_position(
-                torch.tensor(joint_state, dtype=torch.float32, device='cuda:0').view(1,-1)
-                )
+        # if type(joint_state) != JointState:
+        #     joint_state = JointState.from_position(
+        #         torch.tensor(joint_state, dtype=torch.float32, device='cuda:0').view(1,-1)
+        #         )
         match self.control_mode:
             case ControlMode.POSITION:
                 # self._pb.setJointMotorControlArray(
@@ -900,7 +899,8 @@ class robot_arm(object):
                         bodyUniqueId=self.ur,
                         jointIndex=self.ur_joints[joint_id],
                         controlMode=pb.POSITION_CONTROL,
-                        targetPosition=joint_state.position.view(-1)[joint_id],
+                        # targetPosition=joint_state.position.view(-1)[joint_id],
+                        targetPosition=joint_state[joint_id],
                         positionGain=1,
                         maxVelocity=speed,
                     )
@@ -909,7 +909,8 @@ class robot_arm(object):
                     bodyIndex=self.ur,
                     jointIndices=self.ur_joints,
                     controlMode=pb.VELOCITY_CONTROL,
-                    targetPositions=joint_state.position.view(-1),
+                    # targetPositions=joint_state.position.view(-1),
+                    targetPosition=joint_state[joint_id],
                     targetVelocities=joint_state.velocity.view(-1),
                     positionGains=np.ones(len(self.ur_joints)),
                 )

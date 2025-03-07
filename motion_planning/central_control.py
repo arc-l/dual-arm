@@ -11,16 +11,12 @@ from typing import Dict, List
 from matplotlib import pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
-import torch
 
 from motion_planning.utils import env_pose_to_sim_pose, Action
 from motion_planning.robot_arm import robot_arm, ControlMode
 from constants import WORKSPACE_SIZE, EPSILON, PNP_ROT
 from motion_planning.plan_recorder import Arm_State, Plan_Recorder
 from tools.util import Colors
-
-from curobo.types.robot import JointState
-
 
 
 class central_control(object):
@@ -822,80 +818,38 @@ class central_control(object):
                         self.arms[armID].activate(arm_state.involved_object)
                     elif arm_state.motion_status == 'D':
                         self.arms[armID].deactivate(arm_state.involved_object)
-                dual_position = torch.tensor(
-                    np.concatenate([self.recorder.record[i][time_step].joint_state for i in range(2)],axis=-1), 
-                    dtype=torch.float32, device='cuda:0'
-                    ).view(-1,1)
-                dual_velocity = torch.tensor(
-                    np.concatenate([self.recorder.record[i][time_step].velocity for i in range(2)],axis=-1), 
-                    dtype=torch.float32, device='cuda:0'
-                    ).view(-1,1)
-                dual_acceleration = torch.tensor(
-                    np.concatenate([self.recorder.record[i][time_step].acceleration for i in range(2)],axis=-1), 
-                    dtype=torch.float32, device='cuda:0'
-                    ).view(-1,1)
-                dual_jerk = torch.tensor(
-                    np.concatenate([self.recorder.record[i][time_step].jerk for i in range(2)],axis=-1), 
-                    dtype=torch.float32, device='cuda:0'
-                    ).view(-1,1)
-                dual_js = JointState(
-                    position=dual_position,
-                    velocity=dual_velocity,
-                    acceleration=dual_acceleration,
-                    jerk=dual_jerk,
-                )
+                # dual_position = torch.tensor(
+                #     np.concatenate([self.recorder.record[i][time_step].joint_state for i in range(2)],axis=-1), 
+                #     dtype=torch.float32, device='cuda:0'
+                #     ).view(-1,1)
+                # dual_velocity = torch.tensor(
+                #     np.concatenate([self.recorder.record[i][time_step].velocity for i in range(2)],axis=-1), 
+                #     dtype=torch.float32, device='cuda:0'
+                #     ).view(-1,1)
+                # dual_acceleration = torch.tensor(
+                #     np.concatenate([self.recorder.record[i][time_step].acceleration for i in range(2)],axis=-1), 
+                #     dtype=torch.float32, device='cuda:0'
+                #     ).view(-1,1)
+                # dual_jerk = torch.tensor(
+                #     np.concatenate([self.recorder.record[i][time_step].jerk for i in range(2)],axis=-1), 
+                #     dtype=torch.float32, device='cuda:0'
+                #     ).view(-1,1)
+                # dual_js = JointState(
+                #     position=dual_position,
+                #     velocity=dual_velocity,
+                #     acceleration=dual_acceleration,
+                #     jerk=dual_jerk,
+                # )
+                dual_js = np.concatenate([self.recorder.record[i][time_step].joint_state for i in range(2)],axis=-1)
                 self.move_to_dual_state(dual_js, real_time=True)
     
-
-
-    def record_curobo_traj(self, dual_traj, next_subgoals:List[Action]=[None, None], horizon=10):
-        '''
-        record curobo traj to plan recorder
-        dual_traj: JointState
-        motion_status:str = 'T' # T:travel, M:pick or place, A:activate, D:deactivate
-        mode:str = 'G' # A:avoid, G: to a goal joint state
-        '''
-        motion_status = ['T', 'T'] # T:travel, M:pick or place, A:activate, D:deactivate
-        mode = ['G', 'G'] # A:avoid, G: to a goal joint state
-        object_id = [None, None] # grasping/releasing object
-        motion_status_dict = {'T':'T', 'M':'M', 'activate':'A', 'deactivate':'D'}
-        for armID in range(2):
-            if next_subgoals[armID] is not None:
-                if next_subgoals[armID].status in motion_status_dict:
-                    motion_status[armID] = motion_status_dict[next_subgoals[armID].status]
-                elif next_subgoals[armID].comment == 'handoff receive':
-                    motion_status[armID] = 'T'
-                elif next_subgoals[armID].comment == 'handoff delivery':
-                    motion_status[armID] = 'T'
-                else:
-                    raise ValueError('wrong action status')
-                object_id[armID] = next_subgoals[armID].bodyID
-        
-        
-        arm_indices = [arm_id*6 + np.arange(6) for arm_id in range(2)]
-        time_steps, _ = dual_traj.shape
-        for i in range(time_steps):
-            arm_states = dict()
-            for arm_id in range(2):
-                arm_states[arm_id] = Arm_State(
-                    tuple(),
-                    dual_traj[i,arm_indices[arm_id]].position.cpu().numpy(),
-                    object_id[arm_id],
-                    motion_status[arm_id],
-                    mode[arm_id],
-                    dual_traj[i,arm_indices[arm_id]].velocity.cpu().numpy(),
-                    dual_traj[i,arm_indices[arm_id]].acceleration.cpu().numpy(),
-                    dual_traj[i,arm_indices[arm_id]].jerk.cpu().numpy()
-                )
-            self.recorder.add_new_step(arm_states)
-        
     
     def move_to_dual_state(self, dual_state, real_time=False):
         prev_dist = float('inf')
         for arm_id in range(2):
             self.arms[arm_id].move_to_joint(dual_state[(arm_id*6):((arm_id+1)*6)], speed=self.speed)
         
-        target_dual_state = dual_state.position.cpu().numpy().reshape(-1)    
+        target_dual_state = dual_state
         while True:
             for _ in range(1):
                 self.stepSimulation(real_time=real_time)

@@ -7,7 +7,6 @@ from motion_planning.robot_arm import ControlMode
 from constants import WORKSPACE_SIZE, EPSILON, arm0_yml_path, arm1_yml_path, dual_arm_yml_path
 from tools.util import print_progress_bar
 import matplotlib.pyplot as plt
-import torch
 import yaml
 import pickle
 import datetime
