@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import random
 from itertools import permutations
 import matplotlib.pyplot as plt
@@ -6,6 +7,7 @@ import matplotlib.patches as patches
 from dependency_graph import DependencyGraph
 from dataclasses import dataclass
 from enum import Enum
+import json
 
 class TaskState(Enum):
     IN_PROGRESS = 1
@@ -86,7 +88,7 @@ class Task:
         self.object_size = object_size
         self.starts = None
         self.goals = None
-        self.colors = None
+        self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         # self.generate()
         self.start_dict = None
         self.goal_dict = None
@@ -266,35 +268,40 @@ class Task:
         pos = np.array([x, y, self.object_size/2])
         return pos
     
-    def generate(self)->None:
-        # generate random start and goal positions with the boundary
-        # all starts have to be collision free with each other
+    def generate(self, cycled=False) -> None:
+        """Generate random start and goal positions with optional cycling behavior."""
         self.starts = []
         self.goals = []
-        # each start and goal has different colors
-        # interpolate color uniformly
+
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         cnt = 0
+
+        # Generate random unique start positions
         for i in range(self.num_objects):
-            start = self.random_position() 
+            start = self.random_position()
             while self.check_collision(self.starts, start):
                 start = self.random_position()
                 if cnt > 1000:
                     raise RuntimeError('Cannot generate task configuration')
                 cnt += 1
             self.starts.append(start)
-        
-        cnt = 0
-        for i in range(self.num_objects):
-            goal = self.random_position()
-            while self.check_collision(self.goals, goal):
+
+        if cycled:
+            # Create a cyclic goal configuration
+            self.goals = self.starts[1:] + [self.starts[0]]
+        else:
+            cnt = 0
+            for i in range(self.num_objects):
                 goal = self.random_position()
-                if cnt > 1000:
-                    raise RuntimeError('Cannot generate task configuration')
-                cnt += 1
-            self.goals.append(goal)
+                while self.check_collision(self.goals, goal):
+                    goal = self.random_position()
+                    if cnt > 1000:
+                        raise RuntimeError('Cannot generate task configuration')
+                    cnt += 1
+                self.goals.append(goal)
+
         self.init()
-    
+
     def check_collision_between_cubes(self, pos1: np.ndarray, pos2: np.ndarray, clearance=0)->bool:
         # check if two rectangles are colliding
         # pos1 and pos2 are the center of the rectangles
@@ -639,19 +646,72 @@ class Task:
 
     def is_direct_dependent(self, i:int, j:int):
         return self.dependency_graph.is_directly_dependent(i, j)
+    
+    def write_to_json(self, filename: str):
+        data = {
+            'starts': [start.tolist() for start in self.starts],
+            'goals': [goal.tolist() for goal in self.goals],
+            'object_size': self.object_size,
+            'map_width': self.map_width,
+            'map_length': self.map_length
+        }
+        with open(filename, 'w') as f:
+            json.dump(data, f, indent=4)
+
+    @staticmethod
+    def read_from_json(filename: str):
+        with open(filename, 'r') as f:
+            data = json.load(f)
+
+        task = Task(len(data['starts']), data['map_width'], data['map_length'], data['object_size'])
+        task.starts = [np.array(start) for start in data['starts']]
+        task.goals = [np.array(goal) for goal in data['goals']]
+        task.init()
+        return task
+
+
+def generate_dataset(num_samples: int, folder: str = 'data'):
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    
+    for i in range(num_samples):
+        num_objects = random.randint(2, 10)  # Randomize the number of objects between 2 and 10
+        
+        # Generate random configuration
+        task = Task(num_objects, 0.6, 0.6, 0.05)
+        task.generate(cycled=False)
+        filename = f"{folder}/task_random_{num_objects}_objects_{i}.json"
+        task.write_to_json(filename)
+        print(f"Saved: {filename}")
+        
+        # Generate cycled configuration
+        task = Task(num_objects, 0.6, 0.6, 0.05)
+        task.generate(cycled=True)
+        filename = f"{folder}/task_cycled_{num_objects}_objects_{i}.json"
+        task.write_to_json(filename)
+        print(f"Saved: {filename}")
 
 
 # debug
 if __name__ == '__main__':
+    # make folder for the data if the folder does not exist
+    # debug the whole process
+    if not os.path.exists('data'):
+        os.makedirs('data')
     task = Task(10, 0.6, 0.6, 0.05)
     task.generate()
-    # task.generate_fixed_six_objects()
-    # task.generate_fixed_two_objects()
-    print("Dependency Graph")
-    print(task.dependency_graph.get_dependency_graph())
-    print(task.get_independent_sets())
-    print("Has cycles: ", task.dependency_graph.has_cycles())
-    cycles = task.dependency_graph.get_cycles()
-    print("Cycles: ", cycles)
-    task.draw()
+    task.write_to_json('data/task.json')
+    
+    task1 = Task.read_from_json('data/task.json')
+    task1.draw()
+    print(task1.get_starts())
+    print(task1.get_goals())
+
+    for i in range(2, 11):
+        task = Task(i, 0.6, 0.6, 0.05)
+        task.generate_fixed_cycled_objects()
+        task.write_to_json(f'data/task_fixed_cycled_{i}_objects.json')
+    # Generate dataset
+    generate_dataset(20, 'data')
+
 
