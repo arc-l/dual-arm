@@ -3,3 +3,4 @@ __pycache__/
 **/*.pyc
 **/*.pyo
 motion_planning/recorded_plan.pkl
+results/

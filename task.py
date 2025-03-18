@@ -193,12 +193,14 @@ class Task:
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
     
-    def generate_fixed_cycled_objects(self)->None:
+    def generate_fixed_cycled_objects(self, radius = None)->None:
         self.starts = []
         self.goals = []
+        if radius is None:
+            radius = min(self.map_width, self.map_length)/2 - 2 * self.object_size
         for i in range(self.num_objects):
-            x = np.cos(2 * np.pi * i / self.num_objects) * (self.map_width/2- 2 * self.object_size)
-            y = np.sin(2 * np.pi * i / self.num_objects) * (self.map_length/2 - 2 * self.object_size)
+            x = np.cos(2 * np.pi * i / self.num_objects) * radius
+            y = np.sin(2 * np.pi * i / self.num_objects) * radius
             start = np.array([x, y, self.object_size/2])
             self.starts.append(start)
         for i in range(self.num_objects):
@@ -675,21 +677,20 @@ def generate_dataset(num_samples: int, folder: str = 'data'):
         os.makedirs(folder)
     
     for i in range(num_samples):
-        num_objects = random.randint(2, 10)  # Randomize the number of objects between 2 and 10
-        
-        # Generate random configuration
-        task = Task(num_objects, 0.6, 0.6, 0.05)
-        task.generate(cycled=False)
-        filename = f"{folder}/task_random_{num_objects}_objects_{i}.json"
-        task.write_to_json(filename)
-        print(f"Saved: {filename}")
-        
-        # Generate cycled configuration
-        task = Task(num_objects, 0.6, 0.6, 0.05)
-        task.generate(cycled=True)
-        filename = f"{folder}/task_cycled_{num_objects}_objects_{i}.json"
-        task.write_to_json(filename)
-        print(f"Saved: {filename}")
+        for num_objects in range(2, 8):
+            # Generate random configuration
+            task = Task(num_objects, 0.6, 0.6, 0.05)
+            task.generate(cycled=False)
+            filename = f"{folder}/task_random_{num_objects}_objects_{i}.json"
+            task.write_to_json(filename)
+            print(f"Saved: {filename}")
+            
+            # Generate cycled configuration
+            task = Task(num_objects, 0.6, 0.6, 0.05)
+            task.generate(cycled=True)
+            filename = f"{folder}/task_cycled_{num_objects}_objects_{i}.json"
+            task.write_to_json(filename)
+            print(f"Saved: {filename}")
 
 
 # debug
@@ -712,6 +713,6 @@ if __name__ == '__main__':
         task.generate_fixed_cycled_objects()
         task.write_to_json(f'data/task_fixed_cycled_{i}_objects.json')
     # Generate dataset
-    generate_dataset(20, 'data')
+    generate_dataset(2, 'data')
 
 

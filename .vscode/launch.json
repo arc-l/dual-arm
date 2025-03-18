@@ -20,6 +20,19 @@
             "program": "baseline_dual_arm.py",
             "console": "integratedTerminal",
             "args": ""
+        },
+        {
+            "name": "evaluation.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "evaluation.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--input",
+                "data/task_fixed_cycled_8_objects.json",
+                "--method",
+                "baseline"
+            ]
         }
     ]
 }

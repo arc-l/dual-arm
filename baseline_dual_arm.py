@@ -46,6 +46,8 @@ class Baseline(DualArmEnv):
     def plan(self):
         self.get_ready()
         start_arr, goal_arr = self.prepare_input()
+        print("start_arr", start_arr)
+        print("goal_arr", goal_arr)
         Height = 1000
         Width = 1000
         control_mode = ControlMode.POSITION
@@ -70,7 +72,7 @@ class Baseline(DualArmEnv):
             Width, Height,start_arr, goal_arr, size, action_list, 
             overlap_rate = 1.0, speed=speed, 
             time_step_size=time_step_size, control_mode=control_mode, 
-            gui=True, method=method, debug = True)
+            gui=True, method=method, debug = False)
         
         recorded_plan = result_dict['recorded_plan']
         recorded_plan = self.post_process(recorded_plan)
@@ -148,7 +150,7 @@ if __name__ == '__main__':
     # task.generate(cycled=True)
     # task.generate_fixed_two_objects(offset=0.)
     # task.generate_chained_two_objects()
-    task.generate_fixed_cycled_objects()
+    task.generate_fixed_cycled_objects(radius=0.2)
     # task.generate_fixed_two_objects_to_test_grasp_orientation()
     # task.generate_fixed_two_to_test_batch_planner()
     # task.generate_fixed_four_objects()

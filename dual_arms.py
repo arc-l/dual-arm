@@ -1647,16 +1647,17 @@ if __name__ == '__main__':
     map_width:float = 0.6 
     map_length:float = 0.6 
     object_size:float = 0.05 
-    task = Task(num_objects, map_width, map_length, object_size)
+    # task = Task(num_objects, map_width, map_length, object_size)
     # task.generate()
     # task.generate_fixed_two_objects(offset=0.)
     # task.generate_chained_two_objects()
-    task.generate_fixed_cycled_objects()
+    # task.generate_fixed_cycled_objects()
     # task.generate_fixed_two_objects_to_test_grasp_orientation()
     # task.generate_fixed_two_to_test_batch_planner()
     # task.generate_fixed_four_objects()
     # task.generate_chained_four_objects()
     # task.generate_fixed_six_objects()
+    task = Task.read_from_json("data/task_random_9_objects_17.json")
     dual_arm = DualArmEnv(task,
                           simulation_app,
                           batch_size = 3,
