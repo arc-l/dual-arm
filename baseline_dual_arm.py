@@ -70,7 +70,7 @@ class Baseline(DualArmEnv):
             Width, Height,start_arr, goal_arr, size, action_list, 
             overlap_rate = 1.0, speed=speed, 
             time_step_size=time_step_size, control_mode=control_mode, 
-            gui=True, method=method, debug = False)
+            gui=True, method=method, debug = True)
         
         recorded_plan = result_dict['recorded_plan']
         recorded_plan = self.post_process(recorded_plan)
@@ -83,7 +83,7 @@ class Baseline(DualArmEnv):
         gripper_closed = {self.arm1: False, self.arm2: False}
         for time_step in range(len(recorded_plan[0])):
             # recorded_plan[0][time_step].joint_state[0] -= np.pi/2
-            recorded_plan[1][time_step].joint_state[0] += np.pi
+            # recorded_plan[1][time_step].joint_state[0] += np.pi
             dual_position = torch.tensor(
                 np.concatenate([recorded_plan[i][time_step].joint_state for i in range(2)],axis=-1), 
                 dtype=torch.float32, device='cuda:0'

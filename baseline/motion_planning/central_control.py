@@ -46,19 +46,19 @@ class central_control(object):
         self.speed = speed
         self.arms_home_joints = [
             np.array([0, -0.8, 0.5, -0.2, -0.5, 0]) * np.pi, # [ 0., -2.51327412, 1.57079633, -0.62831853, -1.57079633, 0.]
-            np.array([-1, -0.8, 0.5, -0.2, -0.5, 0]) * np.pi, # [ -3.1415926., -2.51327412, 1.57079633, -0.62831853, -1.57079633, 0.]
+            np.array([0, -0.8, 0.5, -0.2, -0.5, 0]) * np.pi, # [ -3.1415926., -2.51327412, 1.57079633, -0.62831853, -1.57079633, 0.]
         ]
         self.arms_first_joints = [
             np.array([-0., -2.1633484,   1.7050244,  -1.1028812,  -1.5651518,  0]),
-            np.array([-3.14, -2.1607058,  1.7094864, -1.1291537, -1.5776776, 0]),
+            np.array([0, -2.1607058,  1.7094864, -1.1291537, -1.5776776, 0]),
         ]
         self.arms_ik_rest_joints = [
             np.array([0, -0.5, 0.5, -0.5, -0.5, 0]) * np.pi,
-            np.array([-1, -0.5, 0.5, -0.5, -0.5, 0]) * np.pi,
+            np.array([0, -0.5, 0.5, -0.5, -0.5, 0]) * np.pi,
         ]
         self.arms_avoid_joints = [
             np.array([-0.87030536, -2.2162654,   1.3529284,  -0.69680774, -1.570098,   -0.5554225]),
-            np.array([-3.841997,   -2.3679318,   1.7499532,  -0.96347654, -1.5787702,  -3.525451])
+            np.array([-0.841997,   -2.3679318,   1.7499532,  -0.96347654, -1.5787702,  -3.525451])
         ]
         self.handoff_position = [0.5, 0.0, 0.7]
         self.handoff_euler = [
@@ -269,7 +269,8 @@ class central_control(object):
                 speed=self.speed, 
                 pnp_steps=self.pnp_steps, 
                 control_mode=self.control_mode,
-                time_step=self.time_step
+                time_step=self.time_step,
+                orientation=self._pb.getQuaternionFromEuler([0.0, -0.0, 3.141592653589793])
                 )
         ]
         

@@ -28,7 +28,7 @@ class robot_arm(object):
         self, arm_id, Width, Height, start_arr, goal_arr, radius, 
         task_list, pb_env, object_body_ids, position, overlap_rate,
         speed = 0.3141592653589793, pnp_steps = 2, control_mode=ControlMode.POSITION,
-        time_step=1/240.0
+        time_step=1/240.0, orientation=[0,0,0,1]
         ) -> None:
         '''
         Robot behaviour control system
@@ -46,6 +46,7 @@ class robot_arm(object):
         self._pb = pb_env
         self.object_body_ids = object_body_ids
         self.base_position = position
+        self.base_orientation = orientation
         self.overlap_rate = overlap_rate
         self.speed = speed
         self.pnp_steps = pnp_steps
@@ -512,8 +513,8 @@ class robot_arm(object):
     def solve_ik(self, pose, is_handoff=False):
         """Calculate joint configuration with inverse kinematics."""
         if self.arm_id == 1:
-            lowerLimits = [-4.5, -3.141, -3.141, -6.283, -6.283, -6.283]
-            upperLimits = [-1.5, 6.283, 3.141, 6.283, 6.283, 6.283]
+            lowerLimits = [-1.5, -3.141, -3.141, -6.283, -6.283, -6.283]
+            upperLimits = [1.5, 6.283, 3.141, 6.283, 6.283, 6.283]
             jointRanges = [3, 9.424, 6.282, 12.566, 12.566, 12.566]
             # lowerLimits = [-6.283, -6.283, -3.141, -6.283, -6.283, -6.283]
             # upperLimits = [6.283, 6.283, 3.141, 6.283, 6.283, 6.283]
@@ -579,7 +580,7 @@ class robot_arm(object):
         """Load ur5e in a given position"""
         current_folder = os.path.dirname(os.path.abspath(__file__))
         ur5e = self._pb.loadURDF(
-            os.path.join(current_folder, "assets/ur5e/ur5e.urdf"), basePosition=position, useFixedBase=True
+            os.path.join(current_folder, "assets/ur5e/ur5e.urdf"), basePosition=position, baseOrientation=self.base_orientation, useFixedBase=True
         )
         ur5e_joints = []
         for i in range(self._pb.getNumJoints(ur5e)):
