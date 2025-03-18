@@ -9,17 +9,17 @@ import argparse
 from colorama import init
 from numpy import random
 
-from solvers.high_level_solver import high_level_search
-from tools.animation import plan_animation
-from tools.show_arrangements import show_arrangements
-from tools.generate_arrangements import load_arrangement
-from high_level_planners.Bi_Directional_Search_Tree_Planner import Bi_Directional_Search_Tree_Planner
+from baseline.solvers.high_level_solver import high_level_search
+from baseline.tools.animation import plan_animation
+from baseline.tools.show_arrangements import show_arrangements
+from baseline.tools.generate_arrangements import load_arrangement
+from baseline.high_level_planners.Bi_Directional_Search_Tree_Planner import Bi_Directional_Search_Tree_Planner
 # from simulation.simulation import simulation
-from motion_planning.simulation import simulation
-from motion_planning.robot_arm import ControlMode
-from motion_planning.plan_recorder import Plan_Recorder
-from tools.util import write_to_log,write_title,write_a_plan, write_a_traj, read_a_traj, get_real_arrangement, load_real_arrangement,real_env_to_plan_env
-from constants import WORKSPACE_SIZE
+from baseline.motion_planning.simulation import simulation
+from baseline.motion_planning.robot_arm import ControlMode
+from baseline.motion_planning.plan_recorder import Plan_Recorder
+from baseline.tools.util import write_to_log,write_title,write_a_plan, write_a_traj, read_a_traj, get_real_arrangement, load_real_arrangement,real_env_to_plan_env
+from baseline.constants import WORKSPACE_SIZE
 
 
 
@@ -50,8 +50,9 @@ def run_simulation(args):
         goal_arr = load_arrangement(numObjs, Density, overlap_rate, ID2)
         Height = 1000
         Width = 2*Height/(1+overlap_rate)
-        radius = math.sqrt(Density * Width * Height / numObjs / math.pi)
-        radius = min(0.036*1000/WORKSPACE_SIZE,radius) # the opened hand is 8.5cm, and give some margin
+        # radius = math.sqrt(Density * Width * Height / numObjs / math.pi)
+        # radius = min(0.036*1000/WORKSPACE_SIZE,radius) # the opened hand is 8.5cm, and give some margin
+        radius = 37.5
         time_step_size = 0.02 # 1/240.0
         speed = 0.3141592653589793 * 5
         method = 'baseline_v2'

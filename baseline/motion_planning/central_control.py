@@ -12,11 +12,11 @@ from matplotlib import pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 
-from motion_planning.utils import env_pose_to_sim_pose, Action
-from motion_planning.robot_arm import robot_arm, ControlMode
-from constants import WORKSPACE_SIZE, EPSILON, PNP_ROT
-from motion_planning.plan_recorder import Arm_State, Plan_Recorder
-from tools.util import Colors
+from baseline.motion_planning.utils import env_pose_to_sim_pose, Action
+from baseline.motion_planning.robot_arm import robot_arm, ControlMode
+from baseline.constants import WORKSPACE_SIZE, EPSILON, PNP_ROT
+from baseline.motion_planning.plan_recorder import Arm_State, Plan_Recorder
+from baseline.tools.util import Colors
 
 
 class central_control(object):
@@ -119,7 +119,7 @@ class central_control(object):
         current_folder = os.path.dirname(os.path.abspath(__file__))
         self.workspace = self._pb.loadURDF(
             os.path.join(current_folder, "assets/workspace/workspace.urdf"),
-            basePosition=(0.50, 0, 0.03),
+            basePosition=(0.50, 0, 0.0),
             useFixedBase=True,
         )
 

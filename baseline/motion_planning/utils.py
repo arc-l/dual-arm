@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import pybullet as p
-from constants import WORKSPACE_SIZE, SIM_CENTER
+from baseline.constants import WORKSPACE_SIZE, SIM_CENTER
 
 
 class Colors:
@@ -26,8 +26,8 @@ def env_pose_to_sim_pose( pose, overlap_rate):
         return (
             pose[0]/1000*size+(ws_center[0]-size/(1+overlap_rate)),
             pose[1]/1000*size+(ws_center[1]-size/2),
-            # 0.023000000044703484
-            0.053
+            0.023000000044703484
+            # 0.053
         )
         
 

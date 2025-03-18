@@ -662,7 +662,14 @@ class DualArmEnv:
     def gripper_control(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
         dof_upper = self.robot.dof_properties["upper"]
         gripper_closed_pos = dof_upper[self.gripper_primary_indices[0]]
-        gripper_pos = np.array([gripper1_action.value * gripper_closed_pos, gripper2_action.value * gripper_closed_pos])
+        gripper1_pos = gripper1_action.value * gripper_closed_pos
+        gripper2_pos = gripper2_action.value * gripper_closed_pos
+        gripper_primary_positions = self.get_primary_gripper_positions()
+        if gripper1_action == GripperAction.CLOSE and self.gripper_closed[self.arm1]:
+            gripper1_pos = gripper_primary_positions[0]
+        if gripper2_action == GripperAction.CLOSE and self.gripper_closed[self.arm2]:
+            gripper2_pos = gripper_primary_positions[1]
+        gripper_pos = np.array([gripper1_pos, gripper2_pos])
         old_gripper_positions = self.get_gripper_positions()
         while self.simulation_app.is_running():
             # get full dof state
@@ -1311,7 +1318,7 @@ class DualArmEnv:
                     return
     
     def remove_gripper_dof_from_js(self, js: JointState):
-        js = js.get_ordered_joint_state(self.single_motion_gen.kinematics.joint_names)
+        js = js.get_ordered_joint_state(self.arm_joint_names)
         return js
         
     def get_robot_dof_indices(self, joint_names: list):

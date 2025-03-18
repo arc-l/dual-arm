@@ -1,0 +1,161 @@
+import curobo
+from curobo.types.state import JointState
+import os
+os.environ['CUROBO_TORCH_CUDA_GRAPH_RESET'] = '1'
+import random
+import torch
+
+import numpy as np
+import time
+import isaacsim
+from typing import List
+from omni.isaac.kit import SimulationApp
+if __name__ == '__main__':
+    simulation_app = SimulationApp({
+                    "headless": False,
+                    "width": "1920",
+                    "height": "1080",
+    })
+from dual_arms import DualArmEnv
+# from isaacsim import SimulationApp
+from baseline.motion_planning.simulation import simulation
+from baseline.high_level_planners.Bi_Directional_Search_Tree_Planner import Bi_Directional_Search_Tree_Planner
+from baseline.experiments import plan2schedule
+from baseline.motion_planning.robot_arm import ControlMode
+from task import Task, GripperAction
+
+class Baseline(DualArmEnv):
+    def __init__(self, task: Task, simulation_app: SimulationApp):
+        super().__init__(task, simulation_app, batch_size = 3, constrain_grasp_approach=False, visualize_spheres=False)
+
+    def prepare_input(self):
+        starts = self.task.get_starts().copy()
+        goals = self.task.get_goals().copy()
+        start_arr = {}
+        goal_arr = {}
+        for i in range(len(starts)):
+            starts[i] = 1000 * starts[i]/0.6 + 500
+            goals[i] = 1000 * goals[i]/0.6 + 500
+            starts[i] = starts[i].tolist()[:2]
+            goals[i] = goals[i].tolist()[:2]
+            start_arr[i] = starts[i]
+            goal_arr[i] = goals[i]
+        return start_arr, goal_arr
+
+
+    def plan(self):
+        self.get_ready()
+        start_arr, goal_arr = self.prepare_input()
+        Height = 1000
+        Width = 1000
+        control_mode = ControlMode.POSITION
+        size = 37.5 # 0.0225 / 0.6 * 1000
+        time_step_size = 0.02
+        speed = 0.3141592653589793 * 5
+        method = 'baseline_v2'
+        planner = Bi_Directional_Search_Tree_Planner(
+            start_arr, 
+            goal_arr, 
+            Height, 
+            Width, 
+            size, 
+            sampling=True, 
+            overlap_rate=1.0, 
+            num_arms=2,
+            makespan='MC'
+        )
+        action_list = planner.action_list
+        action_list = plan2schedule(action_list)
+        result_dict, control = simulation(
+            Width, Height,start_arr, goal_arr, size, action_list, 
+            overlap_rate = 1.0, speed=speed, 
+            time_step_size=time_step_size, control_mode=control_mode, 
+            gui=True, method=method, debug = False)
+        
+        recorded_plan = result_dict['recorded_plan']
+        recorded_plan = self.post_process(recorded_plan)
+        return recorded_plan
+        
+    
+    def post_process(self, recorded_plan):
+        plan = []
+        cmd_plan = []
+        gripper_closed = {self.arm1: False, self.arm2: False}
+        for time_step in range(len(recorded_plan[0])):
+            # recorded_plan[0][time_step].joint_state[0] -= np.pi/2
+            recorded_plan[1][time_step].joint_state[0] += np.pi
+            dual_position = torch.tensor(
+                np.concatenate([recorded_plan[i][time_step].joint_state for i in range(2)],axis=-1), 
+                dtype=torch.float32, device='cuda:0'
+                ).view(1,-1)
+            
+            cmd_plan.append(dual_position)
+            if recorded_plan[0][time_step].motion_status in ["A", "D"] or recorded_plan[1][time_step].motion_status in ["A", "D"]:
+                cmd_plan = torch.cat(cmd_plan, dim=0)
+                cmd_plan = JointState.from_position(self.tensor_args.to_device(cmd_plan), self.arm_joint_names)
+                cmd_plan = self.single_motion_gen.get_full_js(cmd_plan)
+                # get only joint names that are in both:
+                if self.common_js_names == [] and self.common_js_indices == []:
+                    for x in self.dof_names:
+                        if x in cmd_plan.joint_names:
+                            self.common_js_indices.append(self.robot.get_dof_index(x))
+                            self.common_js_names.append(x)
+            
+                cmd_plan = cmd_plan.get_ordered_joint_state(self.common_js_names)
+                plan.append(cmd_plan)
+                cmd_plan = []
+                
+                grasp_control = []
+                match recorded_plan[0][time_step].motion_status:
+                    case "A":
+                        grasp_control.append(GripperAction.CLOSE)
+                    case "D":
+                        grasp_control.append(GripperAction.OPEN)
+                    case _:
+                        if gripper_closed[self.arm1]:
+                            grasp_control.append(GripperAction.CLOSE)
+                        else:
+                            grasp_control.append(GripperAction.OPEN)
+                match recorded_plan[1][time_step].motion_status:
+                    case "A":
+                        grasp_control.append(GripperAction.CLOSE)
+                    case "D":
+                        grasp_control.append(GripperAction.OPEN)
+                    case _:
+                        if gripper_closed[self.arm2]:
+                            grasp_control.append(GripperAction.CLOSE)
+                        else:
+                            grasp_control.append(GripperAction.OPEN)
+                
+                plan.append(grasp_control)
+                if grasp_control[0] == GripperAction.CLOSE:
+                    gripper_closed[self.arm1] = True
+                else:
+                    gripper_closed[self.arm1] = False
+                if grasp_control[1] == GripperAction.CLOSE:
+                    gripper_closed[self.arm2] = True
+                else:
+                    gripper_closed[self.arm2] = False
+        return plan
+
+if __name__ == '__main__':
+    # task = Task.read_from_json('data/task.json')
+    num_objects:int = 4  
+    map_width:float = 0.6 
+    map_length:float = 0.6 
+    object_size:float = 0.045 
+    task = Task(num_objects, map_width, map_length, object_size)
+    # task.generate(cycled=True)
+    # task.generate_fixed_two_objects(offset=0.)
+    # task.generate_chained_two_objects()
+    task.generate_fixed_cycled_objects()
+    # task.generate_fixed_two_objects_to_test_grasp_orientation()
+    # task.generate_fixed_two_to_test_batch_planner()
+    # task.generate_fixed_four_objects()
+    # task.generate_chained_four_objects()
+    # task.generate_fixed_six_objects()
+    dual_arm = Baseline(task,
+                        simulation_app,
+                        )
+    recorded_plan = dual_arm.plan()
+    dual_arm.play(recorded_plan=recorded_plan)

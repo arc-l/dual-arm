@@ -12,7 +12,7 @@ from copy import deepcopy
 import toppra as ta
 import toppra.constraint as constraint
 import toppra.algorithm as algo 
-from tools.util import Colors
+from baseline.tools.util import Colors
 
 @dataclass
 class Arm_State:

@@ -9,13 +9,13 @@ from typing import List
 
 # from curobo.types.robot import JointState
 
-from motion_planning.plan_recorder import Arm_State
-from constants import EPSILON
+from baseline.motion_planning.plan_recorder import Arm_State
+from baseline.constants import EPSILON
 
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from tools.util import poly_disk
-from motion_planning.utils import env_pose_to_sim_pose, Task, Action
+from baseline.tools.util import poly_disk
+from baseline.motion_planning.utils import env_pose_to_sim_pose, Task, Action
 from enum import Enum
 
 class ControlMode(Enum):

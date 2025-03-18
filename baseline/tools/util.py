@@ -13,8 +13,8 @@ from ujson import loads, dumps
 import sys
 import pickle
 
-from constants import REAL_CENTER, SIM_CENTER, WORKSPACE_SIZE
-from motion_planning.utils import sim_pose_to_env_pose, env_pose_to_sim_pose
+from baseline.constants import REAL_CENTER, SIM_CENTER, WORKSPACE_SIZE
+from baseline.motion_planning.utils import sim_pose_to_env_pose, env_pose_to_sim_pose
 
 Inf = float('inf')
 

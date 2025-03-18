@@ -1,11 +1,11 @@
 import os, sys
 import math
 import xml.etree.ElementTree as ET
-from motion_planning.central_control import central_control
-from motion_planning.robot_arm import ControlMode
+from baseline.motion_planning.central_control import central_control
+from baseline.motion_planning.robot_arm import ControlMode
 
-from constants import WORKSPACE_SIZE, EPSILON, arm0_yml_path, arm1_yml_path, dual_arm_yml_path
-from tools.util import print_progress_bar
+from baseline.constants import WORKSPACE_SIZE, EPSILON, arm0_yml_path, arm1_yml_path, dual_arm_yml_path
+from baseline.tools.util import print_progress_bar
 import matplotlib.pyplot as plt
 import yaml
 import pickle
@@ -36,7 +36,7 @@ def simulation(
     '''
     update_cube_urdf(radius)
     ws_x, ws_y, robot0_position, robot1_position = get_ws_info(overlap_rate)
-    robot1_position = (robot1_position[0], robot1_position[1]+0.015, robot1_position[2])
+    # robot1_position = (robot1_position[0], robot1_position[1]+0.015, robot1_position[2])
     update_ws_urdf(ws_x, ws_y)
     
     # Setup environment
@@ -54,6 +54,7 @@ def simulation(
         'execution time': 0.0, 
         'plan length': [0.0, 0.0], 
         'raw_plan': None,
+        'recorded_plan': None
         }
     motion_plan_start = time.time()
     if method in ['baseline', 'single-bl']:
@@ -99,6 +100,7 @@ def simulation(
     result_dict['motion planning time'] = time.time() - motion_plan_start
     result_dict['execution time'] = exe_time
     result_dict['plan length'] = [dist[0], dist[1]]
+    result_dict['recorded_plan'] = control.recorder.record
     return result_dict, control
     
 
@@ -142,7 +144,8 @@ def update_cube_urdf(radius):
     current_folder = os.path.dirname(os.path.abspath(__file__))
     scale = (radius/1000.0)/(0.0225/0.6)
     scale /= math.sqrt(2)
-    radius = radius/math.sqrt(2)
+    # radius = radius/math.sqrt(2)
+    scale = 1.0
     urdf_file = os.path.join(current_folder, 'assets', 'blocks', 'cube.urdf')
     tree = ET.parse(urdf_file)
     root = tree.getroot()
