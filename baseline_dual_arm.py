@@ -43,8 +43,8 @@ class Baseline(DualArmEnv):
         return start_arr, goal_arr
 
 
-    def plan(self):
-        self.get_ready()
+    def plan(self, autostart=False):
+        self.get_ready(autostart=autostart)
         start_arr, goal_arr = self.prepare_input()
         print("start_arr", start_arr)
         print("goal_arr", goal_arr)

@@ -98,7 +98,7 @@ def load_plan(filename, device='cpu'):
         joint_names=joint_state.joint_names,
         return JointState.from_position(position, joint_names)
 
-    device_plan = [joint_state_to_device(js, device) for js in cpu_plan]
+    device_plan = [joint_state_to_device(js, device) if type(js)==JointState else js for js in cpu_plan]
     return device_plan
 
 

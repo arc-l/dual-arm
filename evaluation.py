@@ -58,11 +58,11 @@ if __name__ == "__main__":
     
     if args.method == "baseline":
         baseline = Baseline(task, simulation_app)
-        plan = baseline.plan()
+        plan = baseline.plan(autostart=True)
     else:
         # Call our method
         dual_arm_env = DualArmEnv(task, simulation_app, batch_size=3, constrain_grasp_approach=False, visualize_spheres=False)
-        plan = dual_arm_env.plan()
+        plan = dual_arm_env.plan(autostart=True)
 
     print("Plan duration:", get_duration(plan))
     # Save the plan

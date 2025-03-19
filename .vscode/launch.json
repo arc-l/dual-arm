@@ -29,9 +29,22 @@
             "console": "integratedTerminal",
             "args": [
                 "--input",
-                "data/task_fixed_cycled_8_objects.json",
+                "data/task_random_4_objects_0.json",
                 "--method",
-                "baseline"
+                "ours"
+            ]
+        },
+        {
+            "name": "load_plan.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "load_plan.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--input",
+                "data/task_random_4_objects_0.json",
+                "--method",
+                "ours"
             ]
         }
     ]

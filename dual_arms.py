@@ -190,6 +190,7 @@ class DualArmEnv:
             # rotation_threshold=0.5,
             # position_threshold=0.5,
             finetune_trajopt_iters=500,
+            high_precision=True,
         )
 
         self.single_motion_gen = MotionGen(single_motion_gen_config)
@@ -275,11 +276,13 @@ class DualArmEnv:
 
 
     
-    def get_ready(self, reset=False):
+    def get_ready(self, reset=False, autostart=False):
         i = 0
         while self.simulation_app.is_running():
             self.world.step(render=True)
             if not self.world.is_playing():
+                if autostart:
+                    self.world.play()
                 if i % 100 == 0:
                     print("**** Click Play to start simulation *****")
                 i += 1
@@ -748,6 +751,12 @@ class DualArmEnv:
         for pair in zip(self.dof_names, sim_js.positions):
             print(pair)
         
+        if self.common_js_names == [] and self.common_js_indices == []:
+            for x in self.dof_names:
+                if x in self.j_names_primary:
+                    self.common_js_indices.append(self.robot.get_dof_index(x))
+                    self.common_js_names.append(x)
+
         if self.visualize_spheres: 
             self.visualize_robot_spheres()
 
@@ -891,14 +900,14 @@ class DualArmEnv:
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
-        if pos1[2] < 2 * self.task.object_size:
-            pos1[2] = min(pos1[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm1][2])
-        if pos2[2] < 2 * self.task.object_size:
-            pos2[2] = min(pos2[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm2][2])
+        # if pos1[2] < 2 * self.task.object_size:
+        #     pos1[2] = min(pos1[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm1][2])
+        # if pos2[2] < 2 * self.task.object_size:
+        #     pos2[2] = min(pos2[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm2][2])
         
-        cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
-        self.recorded_plan.append(cmd_plan)
-        self.visualize_plan(cmd_plan)
+        # cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+        # self.recorded_plan.append(cmd_plan)
+        # self.visualize_plan(cmd_plan)
         # check left and right on the y-axis
         if pos2[0] - pos1[0] < 0.2:
             if 0 < pos1[1] - pos2[1] < 0.1:
@@ -1021,8 +1030,8 @@ class DualArmEnv:
         task_execution_result.buffer = task_plan.buffer
         return cmd_plan, task_execution_result
     
-    def plan(self):
-        self.get_ready()
+    def plan(self, autostart=False):
+        self.get_ready(reset=True, autostart=autostart)
         while not self.task.finished():
             task_plan = self.task.plan()
             cmd_plan = None
@@ -1055,6 +1064,18 @@ class DualArmEnv:
             idx_to_sync = list(range(self.task.num_objects))
             self.recorded_plan.append([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
             self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
+            # go up
+            ee_pos = self.get_current_ee_pos()
+            pos1 = ee_pos[self.arm1]
+            pos2 = ee_pos[self.arm2]
+            if pos1[2] < 2 * self.task.object_size:
+                pos1[2] = min(pos1[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm1][2])
+            if pos2[2] < 2 * self.task.object_size:
+                pos2[2] = min(pos2[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm2][2])
+            
+            cmd_plan = self.move_ee(pos1, task_plan.arm1_angle, pos2, task_plan.arm2_angle)
+            self.recorded_plan.append(cmd_plan)
+            self.visualize_plan(cmd_plan)
             sync_after_open = False
             sync_before_close = False
             if task_plan.arm1_gripper_action == GripperAction.OPEN and task_plan.arm1_assigned_object != -1:
@@ -1093,6 +1114,7 @@ class DualArmEnv:
                 print("Syncing IsaacSim and Curobo after open, idx_to_sync = ", idx_to_sync)
                 # self.sync_isaacsim_curobo(idx_to_sync=idx_to_sync)
                 self.sync_isaacsim_curobo()
+
             self.check_object_collision_enabled()
             self.task.update(task_execution_result)
         return self.recorded_plan
@@ -1174,7 +1196,7 @@ class DualArmEnv:
     
     def find_available_task(self, task_plan: TaskPlan):
         # (900, 900), (900, 450), (900, -450), (450, 900), (450, 450), (450, -450), (-450, 900), (-450, 450), (-450, -450)
-        angles = [900, 450, -450, 901, 451, -451]
+        angles = [900, 901, 450, -450, 451, -451]
         angles_combination = list(product(angles, repeat=2))
         for combo in angles_combination:
             for indices in task_plan.start_goal_pairs:
