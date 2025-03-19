@@ -864,6 +864,10 @@ class DualArmEnv:
             goal_arm2 = self.default_ee_pos[self.arm2]
         else:
             goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ) if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object )
+        
+        # safety pre_grasp
+        goal_arm1[2] += self.task.object_size
+        goal_arm2[2] += self.task.object_size
 
         task_execution_result.arm1_assigned_object = task_plan.arm1_assigned_object 
         task_execution_result.arm2_assigned_object = task_plan.arm2_assigned_object
@@ -1048,11 +1052,13 @@ class DualArmEnv:
                 print("Start and Goal pairs are None")
                 if task_plan.arm2_assigned_object is not None and task_plan.arm1_assigned_object == -1:
                     print("Finishing up for one arm2")
-                    self.find_angle_for_single_arm(task_plan, self.arm2)
+                    if task_plan.arm2_angle is None:
+                        self.find_angle_for_single_arm(task_plan, self.arm2)
                     cmd_plan, task_execution_result = self.motion_plan(task_plan)
                 elif task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object == -1:  
                     print("Finishing up for one arm1")
-                    self.find_angle_for_single_arm(task_plan, self.arm1)
+                    if task_plan.arm1_angle is None:
+                        self.find_angle_for_single_arm(task_plan, self.arm1)
                     cmd_plan, task_execution_result = self.motion_plan(task_plan)
                 # elif (not task_plan.arm1_to_start) and (not task_plan.arm2_to_start):
                 else:
@@ -1063,17 +1069,14 @@ class DualArmEnv:
             self.visualize_plan(cmd_plan)
             idx_to_sync = list(range(self.task.num_objects))
             self.recorded_plan.append([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
+            # go down
+            cmd_plan = self.move_z(-self.task.object_size, task_plan.arm1_angle, task_plan.arm2_angle)
+            self.recorded_plan.append(cmd_plan)
+            self.visualize_plan(cmd_plan)
+
             self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
             # go up
-            ee_pos = self.get_current_ee_pos()
-            pos1 = ee_pos[self.arm1]
-            pos2 = ee_pos[self.arm2]
-            if pos1[2] < 2 * self.task.object_size:
-                pos1[2] = min(pos1[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm1][2])
-            if pos2[2] < 2 * self.task.object_size:
-                pos2[2] = min(pos2[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm2][2])
-            
-            cmd_plan = self.move_ee(pos1, task_plan.arm1_angle, pos2, task_plan.arm2_angle)
+            cmd_plan = self.move_z(4 * self.task.object_size, task_plan.arm1_angle, task_plan.arm2_angle)
             self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
             sync_after_open = False
@@ -1196,7 +1199,7 @@ class DualArmEnv:
     
     def find_available_task(self, task_plan: TaskPlan):
         # (900, 900), (900, 450), (900, -450), (450, 900), (450, 450), (450, -450), (-450, 900), (-450, 450), (-450, -450)
-        angles = [900, 901, 450, -450, 451, -451]
+        angles = [901, 900, 450, -450, 451, -451]
         angles_combination = list(product(angles, repeat=2))
         for combo in angles_combination:
             for indices in task_plan.start_goal_pairs:
@@ -1219,7 +1222,7 @@ class DualArmEnv:
                     return 
     
     def find_available_task_with_buffers(self, task_plan: TaskPlan):
-        angles = [900, 450, -450, 901, 451, -451]
+        angles = [901, 900, 450, -450, 451, -451]
         angles_combination = list(product(angles, repeat=2))
         #TODO: make this buffer size configurable
         buffers = self.task.sample_buffers(10)
@@ -1271,7 +1274,7 @@ class DualArmEnv:
                 return 
                 
     def find_angle_for_single_arm(self, task_plan: TaskPlan, arm: str):
-        angles = [900, 450, -450, 901, 451, -451]
+        angles = [901, 900, 450, -450, 451, -451]
         if arm == self.arm1:
             for angle in angles:
                 start1 = self.default_ee_pos[self.arm1]
@@ -1321,7 +1324,7 @@ class DualArmEnv:
                     return
             
     def find_available_task_for_single_arm(self, task_plan: TaskPlan):
-        angles = [900, 450, -450, 901, 451, -451]
+        angles = [901, 900, 450, -450, 451, -451]
         # angles = [900, 450, -450, 901]
         for angle in angles:
             for indices in task_plan.start_goal_pairs:
@@ -1669,17 +1672,17 @@ if __name__ == '__main__':
     map_width:float = 0.6 
     map_length:float = 0.6 
     object_size:float = 0.05 
-    # task = Task(num_objects, map_width, map_length, object_size)
+    task = Task(num_objects, map_width, map_length, object_size)
     # task.generate()
     # task.generate_fixed_two_objects(offset=0.)
     # task.generate_chained_two_objects()
-    # task.generate_fixed_cycled_objects()
+    task.generate_fixed_cycled_objects()
     # task.generate_fixed_two_objects_to_test_grasp_orientation()
     # task.generate_fixed_two_to_test_batch_planner()
     # task.generate_fixed_four_objects()
     # task.generate_chained_four_objects()
     # task.generate_fixed_six_objects()
-    task = Task.read_from_json("data/task_random_9_objects_17.json")
+    # task = Task.read_from_json("data/task_random_9_objects_17.json")
     dual_arm = DualArmEnv(task,
                           simulation_app,
                           batch_size = 3,

@@ -29,7 +29,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--input",
-                "data/task_random_4_objects_0.json",
+                "data/task_random_3_objects_0.json",
                 "--method",
                 "ours"
             ]
