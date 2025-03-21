@@ -1461,8 +1461,8 @@ class DualArmEnv:
 
     def test_different_grasp_angles(self):
         self.get_ready()
-        angles = [900, 450, -450, 901, 451, -451]
-        # angles = [901, 451, -451]
+        # angles = [900, 450, -450, 901, 451, -451]
+        angles = [901, 451, -451]
         for angle in angles:
             result = self.plan_single_from_curr_js(self.task.starts[0], self.task.starts[1], angle, 900)
             if not result.success:
@@ -1473,6 +1473,8 @@ class DualArmEnv:
             
             cmd_plan = self.get_plan_single(result)
             self.visualize_plan(cmd_plan)
+            cmd = self.move_z(0.3, angle, 900)
+            self.visualize_plan(cmd)
 
         for angle in angles:
             result = self.plan_single_from_curr_js(self.task.starts[0], self.task.starts[1], 900, angle)
@@ -1484,6 +1486,8 @@ class DualArmEnv:
             
             cmd_plan = self.get_plan_single(result)
             self.visualize_plan(cmd_plan)
+            cmd = self.move_z(0.3, 900, angle)
+            self.visualize_plan(cmd)
     
 
     def sync_isaacsim_curobo(self, idx_to_sync: list = None):
@@ -1674,9 +1678,9 @@ if __name__ == '__main__':
     object_size:float = 0.05 
     task = Task(num_objects, map_width, map_length, object_size)
     # task.generate()
-    # task.generate_fixed_two_objects(offset=0.)
+    task.generate_fixed_two_objects(offset=0.)
     # task.generate_chained_two_objects()
-    task.generate_fixed_cycled_objects()
+    # task.generate_fixed_cycled_objects()
     # task.generate_fixed_two_objects_to_test_grasp_orientation()
     # task.generate_fixed_two_to_test_batch_planner()
     # task.generate_fixed_four_objects()
@@ -1693,9 +1697,9 @@ if __name__ == '__main__':
     # dual_arm.test_ik_solve_batch()
     # dual_arm.test_plan_batch()
     # dual_arm.display()
-    # dual_arm.test_different_grasp_angles()
+    dual_arm.test_different_grasp_angles()
     # dual_arm.test_gripper_control()
     # dual_arm.test_move_ee()
-    plan = dual_arm.plan()
-    dual_arm.play(plan)
+    # plan = dual_arm.plan()
+    # dual_arm.play(plan)
     

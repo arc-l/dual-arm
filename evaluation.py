@@ -59,12 +59,17 @@ if __name__ == "__main__":
     if args.method == "baseline":
         baseline = Baseline(task, simulation_app)
         plan = baseline.plan(autostart=True)
-        baseline.play(plan)
+        # baseline.play(plan)
     else:
         # Call our method
         dual_arm_env = DualArmEnv(task, simulation_app, batch_size=3, constrain_grasp_approach=False, visualize_spheres=False)
         plan = dual_arm_env.plan(autostart=True)
 
-    print("Plan duration:", get_duration(plan))
+    duration = get_duration(plan)
+    print("Plan duration:", duration)
+    base_name = os.path.splitext(os.path.basename(args.input))[0]
+    output_filename = os.path.join("results", f"{base_name}_{args.method}_duration.txt")
+    with open(output_filename, "w") as file:
+        file.write(f"{duration}\n")
     # Save the plan
     save_plan(plan, args.input, args.method)

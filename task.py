@@ -270,39 +270,46 @@ class Task:
         pos = np.array([x, y, self.object_size/2])
         return pos
     
-    def generate(self, cycled=False) -> None:
-        """Generate random start and goal positions with optional cycling behavior."""
+    def generate(self, cycled=False, min_dist=0.1) -> None:
+        """Generate random start and goal positions with optional cycling behavior and minimum pairwise distance."""
         self.starts = []
         self.goals = []
-
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         cnt = 0
 
-        # Generate random unique start positions
-        for i in range(self.num_objects):
+        def is_too_close(pos, others):
+            for other in others:
+                if np.linalg.norm(pos[:2] - other[:2]) < min_dist:  # only xy-plane matters
+                    return True
+            return False
+
+        all_positions = []
+
+        for _ in range(self.num_objects):
             start = self.random_position()
-            while self.check_collision(self.starts, start):
+            while is_too_close(start, all_positions):
                 start = self.random_position()
-                if cnt > 1000:
-                    raise RuntimeError('Cannot generate task configuration')
                 cnt += 1
+                if cnt > 1000:
+                    raise RuntimeError('Cannot generate task configuration with given minimum distance')
             self.starts.append(start)
+            all_positions.append(start)
 
         if cycled:
-            # Create a cyclic goal configuration
             self.goals = self.starts[1:] + [self.starts[0]]
         else:
-            cnt = 0
-            for i in range(self.num_objects):
+            for _ in range(self.num_objects):
                 goal = self.random_position()
-                while self.check_collision(self.goals, goal):
+                while is_too_close(goal, all_positions):
                     goal = self.random_position()
-                    if cnt > 1000:
-                        raise RuntimeError('Cannot generate task configuration')
                     cnt += 1
+                    if cnt > 1000:
+                        raise RuntimeError('Cannot generate task configuration with given minimum distance')
                 self.goals.append(goal)
+                all_positions.append(goal)
 
         self.init()
+
 
     def check_collision_between_cubes(self, pos1: np.ndarray, pos2: np.ndarray, clearance=0)->bool:
         # check if two rectangles are colliding
@@ -672,22 +679,22 @@ class Task:
         return task
 
 
-def generate_dataset(num_samples: int, folder: str = 'data'):
+def generate_dataset(num_samples: int, min_dist: float, folder: str = 'data'):
     if not os.path.exists(folder):
         os.makedirs(folder)
     
     for i in range(num_samples):
-        for num_objects in range(2, 8):
+        for num_objects in range(4, 10):
             # Generate random configuration
             task = Task(num_objects, 0.6, 0.6, 0.05)
-            task.generate(cycled=False)
+            task.generate(cycled=False, min_dist=min_dist)
             filename = f"{folder}/task_random_{num_objects}_objects_{i}.json"
             task.write_to_json(filename)
             print(f"Saved: {filename}")
             
             # Generate cycled configuration
             task = Task(num_objects, 0.6, 0.6, 0.05)
-            task.generate(cycled=True)
+            task.generate(cycled=True, min_dist=min_dist)
             filename = f"{folder}/task_cycled_{num_objects}_objects_{i}.json"
             task.write_to_json(filename)
             print(f"Saved: {filename}")
@@ -713,6 +720,6 @@ if __name__ == '__main__':
         task.generate_fixed_cycled_objects()
         task.write_to_json(f'data/task_fixed_cycled_{i}_objects.json')
     # Generate dataset
-    generate_dataset(2, 'data')
+    generate_dataset(2, 0.1, 'data')
 
 
