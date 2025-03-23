@@ -258,6 +258,8 @@ class DualArmEnv:
         self.gripper_joint_indices = []
 
         self.recorded_plan = []
+        self.old_task_plan = None
+        # end of init
 
 
     
@@ -900,55 +902,56 @@ class DualArmEnv:
     def naive_motion_plan(self, task_plan):
         angle1 = task_plan.arm1_angle
         angle2 = task_plan.arm2_angle
-        needs_to_check_grasp_angle = False
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
-        # if pos1[2] < 2 * self.task.object_size:
-        #     pos1[2] = min(pos1[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm1][2])
-        # if pos2[2] < 2 * self.task.object_size:
-        #     pos2[2] = min(pos2[2] + 4 * self.task.object_size, self.default_ee_pos[self.arm2][2])
-        
-        # cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
-        # self.recorded_plan.append(cmd_plan)
-        # self.visualize_plan(cmd_plan)
+
+        if self.old_task_plan is not None:
+            if self.old_task_plan.arm1_angle in [450, -450] or self.old_task_plan.arm2_angle in [450, -450]:
+                match self.old_task_plan.arm1_angle:
+                    case 450:
+                        pos1[1] = max(pos1[1] - 0.3, -0.3)
+                    case -450:
+                        pos1[1] = min(pos1[1] + 0.3, 0.3)
+                match self.old_task_plan.arm2_angle:
+                    case 450:
+                        pos2[1] = min(pos2[1] + 0.3, 0.3)
+                    case -450:
+                        pos2[1] = max(pos2[1] - 0.3, -0.3)
+                
+                cmd_plan = self.move_ee(pos1, self.old_task_plan.arm1_angle, pos2, self.old_task_plan.arm2_angle)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
+
         # check left and right on the y-axis
-        if pos2[0] - pos1[0] < 0.2:
+        if 0 < pos2[0] - pos1[0] < 0.2:
             if 0 < pos1[1] - pos2[1] < 0.1:
                 # arm1 on the left, separate them
-                delta_y = 0.2 
-                pos1[1] = min(pos1[1] + delta_y, 0.25)
-                pos2[1] = max(pos2[1] - delta_y, -0.25)
+                delta_y = 0.3 
+                pos1[1] = min(pos1[1] + delta_y, 0.3)
+                pos2[1] = max(pos2[1] - delta_y, -0.3)
                 cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
                 self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
                 # cmd_plan_total = cmd_plan_total.stack(cmd_plan)
             elif -0.1 < pos1[1] - pos2[1] < 0:
                 # arm2 on the left
-                delta_y = 0.2 
-                pos1[1] = max(pos1[1] - delta_y, -0.25)
-                pos2[1] = min(pos2[1] + delta_y, 0.25)
+                delta_y = 0.3 
+                pos1[1] = max(pos1[1] - delta_y, -0.3)
+                pos2[1] = min(pos2[1] + delta_y, 0.3)
                 cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
                 self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
-            else:
-                needs_to_check_grasp_angle = True
             
         # move back a little bit to seperate them on x-axis
-        if pos2[0] - pos1[0] < 0.2:
-            delta_x = 0.2
-            pos1[0] = max(pos1[0]-delta_x, -0.25)
-            pos2[0] = min(pos1[0]+delta_x, 0.25)
+        if pos2[0] - pos1[0] < 0.3:
+            delta_x = 0.3
+            pos1[0] = max(pos1[0]-delta_x, -0.3)
+            pos2[0] = min(pos1[0]+delta_x, 0.3)
             cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
             self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
-        else:
-            needs_to_check_grasp_angle = False
         
-        if needs_to_check_grasp_angle:
-            print("Not implemented yet")
-            pass
-
         # align with the goal on the y-axis
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
@@ -963,11 +966,40 @@ class DualArmEnv:
         else:
             goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ) if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object )
         
-        pos1[1] = goal_arm1[1]
-        pos2[1] = goal_arm2[1]
-        cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
-        self.recorded_plan.append(cmd_plan)
-        self.visualize_plan(cmd_plan)
+        if angle1 in [450, -450] or angle2 in [450, -450]:
+            match angle1:
+                case 450:
+                    pos1[1] = max(min(goal_arm1[1] - 0.3, self.get_current_ee_pos()[self.arm1][1]-0.3), -0.3)
+                case -450:
+                    pos1[1] = min(max(goal_arm1[1] + 0.3, self.get_current_ee_pos()[self.arm1][1]+0.3), 0.3)
+            
+            match angle2:
+                case 450:
+                    pos2[1] = min(max(goal_arm2[1] + 0.3, self.get_current_ee_pos()[self.arm2][1]+0.3), 0.3)
+                case -450:
+                    pos2[1] = max(min(goal_arm2[1] - 0.3, self.get_current_ee_pos()[self.arm2][1]-0.3), -0.3)
+
+            cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+            self.recorded_plan.append(cmd_plan)
+            self.visualize_plan(cmd_plan)
+            
+            # align with the goal on the x-axis
+            if angle1 in [450, -450]:
+                pos1[0] = goal_arm1[0]
+            if angle2 in [450, -450]:
+                pos2[0] = goal_arm2[0]
+            
+            cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+            self.recorded_plan.append(cmd_plan)
+            self.visualize_plan(cmd_plan)
+
+        else:
+            pos1[1] = goal_arm1[1]
+            pos2[1] = goal_arm2[1]
+
+            cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+            self.recorded_plan.append(cmd_plan)
+            self.visualize_plan(cmd_plan)
     
 
     def batch_motion_plan(self, task_plan):
@@ -1119,6 +1151,7 @@ class DualArmEnv:
                 self.sync_isaacsim_curobo()
 
             self.check_object_collision_enabled()
+            self.old_task_plan = task_plan
             self.task.update(task_execution_result)
         return self.recorded_plan
     
