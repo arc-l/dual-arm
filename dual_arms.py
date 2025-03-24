@@ -876,7 +876,7 @@ class DualArmEnv:
         
     def motion_plan(self, task_plan: TaskPlan):
         task_execution_result = TaskExecutionResult()
-        needs_naive_plan=True#TODO: For only debug
+        needs_naive_plan = True #TODO: Remove this later
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1]
         else:
@@ -913,10 +913,74 @@ class DualArmEnv:
         if needs_naive_plan:
             self.naive_motion_plan(task_plan)
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
-            cmd_plan = self.get_plan_single(result)
-            cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
+            if result.success:
+                cmd_plan = self.get_plan_single(result)
+                cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
+                self.recorded_plan.append([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
+                # go down
+                arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
+                arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
 
-        return cmd_plan, task_execution_result
+                self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
+                # go up
+                arm1_delta_z = 2 * self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
+                arm2_delta_z = 2 * self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
+            else:
+                # one arm by one arm
+                tmp_goal_arm1 = self.default_ee_pos[self.arm1]
+                tmp_goal_arm2 = self.default_ee_pos[self.arm2]
+                # move arm2 to goal, arm1 to retract pose
+                result = self.plan_single_from_curr_js(goal_arm1=tmp_goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
+                cmd_plan = self.get_plan_single(result)
+                cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
+
+                # go down
+                arm1_delta_z = 0
+                arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
+
+                self.gripper_control(GripperAction(self.gripper_closed[self.arm1]), task_plan.arm2_gripper_action)
+                # go up
+                arm1_delta_z = 0
+                arm2_delta_z = 2 * self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
+
+                # move the other arm
+                result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=tmp_goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
+                cmd_plan = self.get_plan_single(result)
+                cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
+                # go down
+                arm2_delta_z = 0
+                arm1_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
+
+                self.gripper_control(task_plan.arm1_gripper_action, GripperAction(self.gripper_closed[self.arm2]))
+                # go up
+                arm2_delta_z = 0
+                arm1_delta_z = 2 * self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                self.recorded_plan.append(cmd_plan)
+                self.visualize_plan(cmd_plan)
+
+        return task_execution_result
     
     def naive_motion_plan(self, task_plan):
         angle1 = task_plan.arm1_angle
@@ -1089,47 +1153,33 @@ class DualArmEnv:
         self.get_ready(reset=True, autostart=autostart)
         while not self.task.finished():
             task_plan = self.task.plan()
-            cmd_plan = None
             task_execution_result = TaskExecutionResult()
             if task_plan.start_goal_pairs is not None and not task_plan.use_buffer:
                 print("Pick two from the start_goal_pairs")
                 self.find_available_task(task_plan)
-                cmd_plan, task_execution_result = self.motion_plan(task_plan)
+                task_execution_result = self.motion_plan(task_plan)
             elif task_plan.use_buffer:
                 print("Using buffer for one arm")
                 self.find_available_task_with_buffers(task_plan)
-                cmd_plan, task_execution_result = self.motion_plan(task_plan)
+                task_execution_result = self.motion_plan(task_plan)
             elif task_plan.start_goal_pairs is None:
                 print("Start and Goal pairs are None")
                 if task_plan.arm2_assigned_object is not None and task_plan.arm1_assigned_object == -1:
                     print("Finishing up for one arm2")
                     if task_plan.arm2_angle is None:
                         self.find_angle_for_single_arm(task_plan, self.arm2)
-                    cmd_plan, task_execution_result = self.motion_plan(task_plan)
+                    task_execution_result = self.motion_plan(task_plan)
                 elif task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object == -1:  
                     print("Finishing up for one arm1")
                     if task_plan.arm1_angle is None:
                         self.find_angle_for_single_arm(task_plan, self.arm1)
-                    cmd_plan, task_execution_result = self.motion_plan(task_plan)
+                    task_execution_result = self.motion_plan(task_plan)
                 # elif (not task_plan.arm1_to_start) and (not task_plan.arm2_to_start):
                 else:
                     print("Finishing up for both arms")
-                    cmd_plan, task_execution_result = self.motion_plan(task_plan)
+                    task_execution_result = self.motion_plan(task_plan)
             
-            self.recorded_plan.append(cmd_plan)
-            self.visualize_plan(cmd_plan)
             idx_to_sync = list(range(self.task.num_objects))
-            self.recorded_plan.append([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
-            # go down
-            cmd_plan = self.move_z(-self.pre_grasp_height, task_plan.arm1_angle, task_plan.arm2_angle)
-            self.recorded_plan.append(cmd_plan)
-            self.visualize_plan(cmd_plan)
-
-            self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
-            # go up
-            cmd_plan = self.move_z(2 * self.pre_grasp_height, task_plan.arm1_angle, task_plan.arm2_angle)
-            self.recorded_plan.append(cmd_plan)
-            self.visualize_plan(cmd_plan)
             sync_after_open = False
             sync_before_close = False
             if task_plan.arm1_gripper_action == GripperAction.OPEN and task_plan.arm1_assigned_object != -1:
@@ -1655,6 +1705,15 @@ class DualArmEnv:
         print("move_z: pos1 = ", pos1, "pos2 = ", pos2)
         pos1[2] += delta
         pos2[2] += delta
+        return self.move_ee(pos1, angle1, pos2, angle2)
+    
+    def move_z_2(self, delta1, delta2, angle1, angle2):
+        ee_pos = self.get_current_ee_pos()
+        pos1 = ee_pos[self.arm1]
+        pos2 = ee_pos[self.arm2]
+        print("move_z: pos1 = ", pos1, "pos2 = ", pos2)
+        pos1[2] += delta1
+        pos2[2] += delta2
         return self.move_ee(pos1, angle1, pos2, angle2)
     
     def move_x(self, delta, angle1, angle2):
