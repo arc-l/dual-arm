@@ -259,6 +259,7 @@ class DualArmEnv:
 
         self.recorded_plan = []
         self.old_task_plan = None
+        self.pre_grasp_height = 2 * self.task.object_size
         # end of init
 
 
@@ -733,6 +734,23 @@ class DualArmEnv:
         
         self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
     
+    def test_grasp(self):
+        self.get_ready()
+        angle1 = 900
+        angle2 = -450 
+        cube = self.objects_isaacsim_dynamic[1]
+        c_p1, _ = cube.get_world_pose()
+        cube = self.objects_isaacsim_dynamic[0]
+        c_p2, _ = cube.get_world_pose()
+        c_p1[2] += 0.1
+        c_p2[2] += 0.1
+        result = self.plan_single_from_curr_js(c_p1, c_p2, angle1, angle2)
+        cmd_plan = self.get_plan_single(result)
+        self.visualize_plan(cmd_plan)
+        self.visualize_plan(self.move_z(-0.1, angle1, angle2))
+        self.gripper_control(GripperAction.CLOSE, GripperAction.CLOSE)
+        self.visualize_plan(self.move_z(0.1, angle1, angle2))
+    
     def reset(self):
         self.world.reset()
         idx_list = [self.robot.get_dof_index(x) for x in self.j_names]
@@ -828,10 +846,11 @@ class DualArmEnv:
 
             cube_isaac = cuboid.VisualCuboid(
                 "/World/visual_goals" + str(i),
-                position = [goal[0], goal[1], goal[2]],
+                position = [goal[0], goal[1], self.task.object_size/2 * 0.1],
                 orientation = [1, 0, 0, 0],
                 color = colors[i], 
                 size=self.task.object_size,
+                scale=[1.1, 1.1, 0.1]
                 # visual_material=material
             )
             self.add_opacity_material(
@@ -868,8 +887,8 @@ class DualArmEnv:
             goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ) if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object )
         
         # safety pre_grasp
-        goal_arm1[2] += self.task.object_size
-        goal_arm2[2] += self.task.object_size
+        goal_arm1[2] += self.pre_grasp_height
+        goal_arm2[2] += self.pre_grasp_height
 
         task_execution_result.arm1_assigned_object = task_plan.arm1_assigned_object 
         task_execution_result.arm2_assigned_object = task_plan.arm2_assigned_object
@@ -1102,13 +1121,13 @@ class DualArmEnv:
             idx_to_sync = list(range(self.task.num_objects))
             self.recorded_plan.append([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
             # go down
-            cmd_plan = self.move_z(-self.task.object_size, task_plan.arm1_angle, task_plan.arm2_angle)
+            cmd_plan = self.move_z(-self.pre_grasp_height, task_plan.arm1_angle, task_plan.arm2_angle)
             self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
 
             self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
             # go up
-            cmd_plan = self.move_z(4 * self.task.object_size, task_plan.arm1_angle, task_plan.arm2_angle)
+            cmd_plan = self.move_z(2 * self.pre_grasp_height, task_plan.arm1_angle, task_plan.arm2_angle)
             self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
             sync_after_open = False
@@ -1288,16 +1307,28 @@ class DualArmEnv:
                     ik_goal1.position += self.tensor_args.to_device(buffers)
                     ik_goal2.position += self.tensor_args.to_device(goal2)
                 goal_ik_results = self.ik_solve_batch(ik_goal1, ik_goal2)
-                # randomly pick one successful buffer as temporary goal
                 success_indices = torch.where(goal_ik_results.success)[0]
                 if len(success_indices) == 0:
                     continue
+
+                # pick the one buffer that is furthest to all the objects
+                available_buffers = buffers[success_indices.cpu().tolist()]
+                object_positions, _ = self.get_current_cube_pose()
+                furthest_buffer = None
+                max_min_dist = -1
+                for buffer in available_buffers:
+                    dists = [np.linalg.norm(buffer - obj_pos) for obj_pos in object_positions]
+                    min_dist = min(dists)
+                    if min_dist > max_min_dist:
+                        max_min_dist = min_dist
+                        furthest_buffer = buffer
+
                 idx = random.choice(success_indices)
                 task_plan.buffer = {1: None, 2: None}
                 if goal1_dependent_on_goal2:
-                    task_plan.buffer[2] = buffers[idx]
+                    task_plan.buffer[2] = furthest_buffer
                 else:
-                    task_plan.buffer[1] = buffers[idx]
+                    task_plan.buffer[1] = furthest_buffer
                 task_plan.arm1_assigned_object = indices[0]
                 task_plan.arm2_assigned_object = indices[1]
                 task_plan.arm1_angle = angle1
@@ -1412,10 +1443,8 @@ class DualArmEnv:
         positions = js.position.cpu().numpy()
         for arm, gripper_primary_name in self.gripper_primary_joints_dict.items():
             idx = self.common_js_names.index(gripper_primary_name)
-            positions[idx] = gripper_primary_pos_dict[gripper_primary_name] + 0.005 * self.gripper_closed[arm]
-        # for gripper_primary_name in self.gripper_primary_joints:
-        #     idx = self.common_js_names.index(gripper_primary_name)
-        #     positions[idx] = gripper_primary_pos_dict[gripper_primary_name]
+            # positions[idx] = gripper_primary_pos_dict[gripper_primary_name] + 0.005 * self.gripper_closed[arm]
+            positions[idx] = gripper_primary_pos_dict[gripper_primary_name] 
         return positions
     
     def get_current_arm_js(self):
@@ -1494,23 +1523,16 @@ class DualArmEnv:
 
     def test_different_grasp_angles(self):
         self.get_ready()
-        # angles = [900, 450, -450, 901, 451, -451]
-        angles = [901, 451, -451]
-        for angle in angles:
-            result = self.plan_single_from_curr_js(self.task.starts[0], self.task.starts[1], angle, 900)
-            if not result.success:
-                print("Failed to go to start position")
-                return
-            else:
-                print("Going to the start position")
-            
-            cmd_plan = self.get_plan_single(result)
-            self.visualize_plan(cmd_plan)
-            cmd = self.move_z(0.3, angle, 900)
-            self.visualize_plan(cmd)
+        angles = [900, 450, -450, 901, 451, -451]
+        # angles = [901, 451, -451]
+        cube_positions, _ = self.get_current_cube_pose()
+        pos1 = cube_positions[0]
+        pos2 = cube_positions[1]
+        pos1[2] += self.pre_grasp_height
+        pos2[2] += self.pre_grasp_height
 
         for angle in angles:
-            result = self.plan_single_from_curr_js(self.task.starts[0], self.task.starts[1], 900, angle)
+            result = self.plan_single_from_curr_js(pos1, pos2, 900, angle)
             if not result.success:
                 print("Failed to go to start position")
                 return
@@ -1521,7 +1543,30 @@ class DualArmEnv:
             self.visualize_plan(cmd_plan)
             cmd = self.move_z(0.3, 900, angle)
             self.visualize_plan(cmd)
+
+        for angle in angles:
+            result = self.plan_single_from_curr_js(pos1, pos2, angle, 900)
+            if not result.success:
+                print("Failed to go to start position")
+                return
+            else:
+                print("Going to the start position")
+            
+            cmd_plan = self.get_plan_single(result)
+            self.visualize_plan(cmd_plan)
+            cmd = self.move_z(0.3, angle, 900)
+            self.visualize_plan(cmd)
     
+    def get_current_cube_pose(self):
+        positions = []
+        rotations = []
+        for i in range(self.task.num_objects):
+            cube_isaac = self.objects_isaacsim_dynamic[i]
+            cube_curobo = self.objects_curobo[i]
+            p, q = cube_isaac.get_world_pose()
+            positions.append(p)
+            rotations.append(q)
+        return positions, rotations
 
     def sync_isaacsim_curobo(self, idx_to_sync: list = None):
         cuboids = []
@@ -1732,6 +1777,7 @@ if __name__ == '__main__':
     # dual_arm.display()
     dual_arm.test_different_grasp_angles()
     # dual_arm.test_gripper_control()
+    # dual_arm.test_grasp()
     # dual_arm.test_move_ee()
     # plan = dual_arm.plan()
     # dual_arm.play(plan)
