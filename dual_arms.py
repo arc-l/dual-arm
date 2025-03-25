@@ -181,10 +181,10 @@ class DualArmEnv:
             collision_activation_distance=0.025,
             fixed_iters_trajopt=True,
             maximum_trajectory_dt=0.5,
-            num_ik_seeds= 100,
-            num_graph_seeds= 32,
-            num_trajopt_seeds= 32,
-            num_batch_ik_seeds= 32,
+            num_ik_seeds= 200,
+            num_graph_seeds= 64,
+            num_trajopt_seeds= 64,
+            num_batch_ik_seeds= 64,
             trajopt_tsteps = 32,
             # ik_opt_iters=1000,
             # rotation_threshold=0.5,
@@ -200,7 +200,7 @@ class DualArmEnv:
             self.world_cfg_curobo,
             rotation_threshold=0.05,
             position_threshold=0.005,
-            num_seeds=100,
+            num_seeds=200,
             self_collision_check=True,
             self_collision_opt=True,
             tensor_args=self.tensor_args,
@@ -768,7 +768,7 @@ class DualArmEnv:
             gravity_magnitude_attr = physics_scene.GetAttribute("physics:gravityMagnitude")
             if not gravity_magnitude_attr:
                 gravity_magnitude_attr = physics_scene.CreateAttribute("physics:gravityMagnitude", float)
-            gravity_magnitude_attr.Set(1.0)
+            gravity_magnitude_attr.Set(5.0)
         else:
             print(f"Physics Scene prim at {physics_scene_path} not found.")
 
@@ -783,6 +783,7 @@ class DualArmEnv:
         for k, v in link_poses.items():
             t_pos = np.ravel(v.to_list())
             self.default_ee_pos[k] = t_pos[:3]
+            self.default_ee_pos[k][2] += 0.15 #TODO: Test this, added 0.15m to z
         # t_pos = np.ravel(kin_state.ee_pose.to_list())
         # self.default_ee_pos = t_pos[:3]
         # self.default_ee_rot = t_pos[3:]
@@ -847,9 +848,9 @@ class DualArmEnv:
         for i in range(self.task.num_objects):
             material = PhysicsMaterial(
                 prim_path=f"/World/physics_material/obstacle{i}",
-                dynamic_friction=10,
-                static_friction=10,
-                # restitution=0.2,
+                dynamic_friction=100,
+                static_friction=100,
+                restitution=0.2,
             )
             start = starts[i]
             goal = goals[i]
@@ -1003,20 +1004,30 @@ class DualArmEnv:
         return task_execution_result
     
     def naive_motion_plan(self, task_plan):
-        angle1 = task_plan.arm1_angle
-        angle2 = task_plan.arm2_angle
+        new_angle1 = task_plan.arm1_angle
+        new_angle2 = task_plan.arm2_angle
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
 
+        old_angle1 = None
+        old_angle2 = None
+
+        angle1 = new_angle1
+        angle2 = new_angle2
+
         if self.old_task_plan is not None:
-            if self.old_task_plan.arm1_angle in [450, -450] or self.old_task_plan.arm2_angle in [450, -450]:
-                match self.old_task_plan.arm1_angle:
+            old_angle1 = self.old_task_plan.arm1_angle if self.old_task_plan is not None else None
+            old_angle2 = self.old_task_plan.arm2_angle if self.old_task_plan is not None else None
+            angle1 = old_angle1 if old_angle1 is not None else new_angle1
+            angle2 = old_angle2 if old_angle2 is not None else new_angle2
+            if old_angle1 in [450, -450] or old_angle2 in [450, -450]:
+                match old_angle1:
                     case 450:
                         pos1[1] = max(pos1[1] - 0.3, -0.3)
                     case -450:
                         pos1[1] = min(pos1[1] + 0.3, 0.3)
-                match self.old_task_plan.arm2_angle:
+                match old_angle2:
                     case 450:
                         pos2[1] = min(pos2[1] + 0.3, 0.3)
                     case -450:
@@ -1082,17 +1093,17 @@ class DualArmEnv:
                 case -450:
                     pos2[1] = max(min(goal_arm2[1] - 0.3, self.get_current_ee_pos()[self.arm2][1]-0.3), -0.3)
 
-            cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+            cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
             self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
             
             # align with the goal on the x-axis
-            if angle1 in [450, -450]:
+            if new_angle1 in [450, -450]:
                 pos1[0] = goal_arm1[0]
-            if angle2 in [450, -450]:
+            if new_angle2 in [450, -450]:
                 pos2[0] = goal_arm2[0]
             
-            cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+            cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
             self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
 
@@ -1100,7 +1111,7 @@ class DualArmEnv:
             pos1[1] = goal_arm1[1]
             pos2[1] = goal_arm2[1]
 
-            cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+            cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
             self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
     
@@ -1320,9 +1331,10 @@ class DualArmEnv:
                 return
     
     def find_available_task(self, task_plan: TaskPlan):
-        # (900, 900), (900, 450), (900, -450), (450, 900), (450, 450), (450, -450), (-450, 900), (-450, 450), (-450, -450)
-        angles = [901, 900, 450, -450, 451, -451]
+        # first, find the avaiable task that uses vertical pick and place
+        angles = [901, 900]
         angles_combination = list(product(angles, repeat=2))
+        print("finding vertical pick and place")
         for combo in angles_combination:
             for indices in task_plan.start_goal_pairs:
                 start1 = self.task.get_start( indices[0] )
@@ -1332,9 +1344,6 @@ class DualArmEnv:
                 angle1, angle2 = combo
                 start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
                 goal_ik_result = self.ik_solve_single(goal1, goal2, angle1, angle2)
-                print(f"start1 = {start1}, goal1 = {goal1}, start2 = {start2}, goal2 = {goal2}")
-                print(f"angle1 = {angle1}, angle2 = {angle2}")
-                print("start_ik_result = ", start_ik_result.success, "goal_ik_result = ", goal_ik_result.success)
                 if start_ik_result.success and goal_ik_result.success:
                     # [start_pos, goal_pos, orientation]
                     task_plan.arm1_assigned_object = indices[0]
@@ -1342,6 +1351,52 @@ class DualArmEnv:
                     task_plan.arm1_angle = angle1
                     task_plan.arm2_angle = angle2
                     return 
+        # if no solution with vertical pick and place, try other angles
+        angles = [901, 900, 450, -450, 451, -451]
+        angles_combination = list(product(angles, repeat=2))
+        print("finding other angles")
+        for combo in angles_combination:
+            for indices in task_plan.start_goal_pairs:
+                start1 = self.task.get_start( indices[0] )
+                goal1 = self.task.get_goal( indices[0] )
+                start2 = self.task.get_start( indices[1] )
+                goal2 = self.task.get_goal( indices[1] )
+                angle1, angle2 = combo
+                start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
+                goal_ik_result = self.ik_solve_single(goal1, goal2, angle1, angle2)
+                if start_ik_result.success and goal_ik_result.success:
+                    # [start_pos, goal_pos, orientation]
+                    task_plan.arm1_assigned_object = indices[0]
+                    task_plan.arm2_assigned_object = indices[1]
+                    task_plan.arm1_angle = angle1
+                    task_plan.arm2_angle = angle2
+                    return 
+        # if still no solution, do it one by one
+        angles = [901, 900, 450, -450, 451, -451]
+        angles_combination = list(product(angles, repeat=2))
+        print("finding one by one")
+        for combo in angles_combination:
+            for indices in task_plan.start_goal_pairs:
+                start1 = self.task.get_start( indices[0] )
+                goal1 = self.task.get_goal( indices[0] )
+                start2 = self.task.get_start( indices[1] )
+                goal2 = self.task.get_goal( indices[1] )
+                angle1, angle2 = combo
+                default_ee_pos1 = self.default_ee_pos[self.arm1]
+                default_ee_pos2 = self.default_ee_pos[self.arm2]
+                start_ik_result1 = self.ik_solve_single(default_ee_pos1, start2, angle1, angle2)
+                start_ik_result2 = self.ik_solve_single(start1, default_ee_pos2, angle1, angle2)
+                goal_ik_result1 = self.ik_solve_single(default_ee_pos1, goal2, angle1, angle2)
+                goal_ik_result2 = self.ik_solve_single(goal1, default_ee_pos2, angle1, angle2)
+                if start_ik_result1.success and start_ik_result2.success and goal_ik_result1.success and goal_ik_result2.success:
+                    # [start_pos, goal_pos, orientation]
+                    task_plan.arm1_assigned_object = indices[0]
+                    task_plan.arm2_assigned_object = indices[1]
+                    task_plan.arm1_angle = angle1
+                    task_plan.arm2_angle = angle2
+                    return 
+        
+
     
     def find_available_task_with_buffers(self, task_plan: TaskPlan):
         angles = [901, 900, 450, -450, 451, -451]
@@ -1513,7 +1568,7 @@ class DualArmEnv:
         positions = js.position.cpu().numpy()
         for arm, gripper_primary_name in self.gripper_primary_joints_dict.items():
             idx = self.common_js_names.index(gripper_primary_name)
-            positions[idx] = gripper_primary_pos_dict[gripper_primary_name] + 0.001 * self.gripper_closed[arm]
+            positions[idx] = gripper_primary_pos_dict[gripper_primary_name] + 0.002 * self.gripper_closed[arm]
             # positions[idx] = gripper_primary_pos_dict[gripper_primary_name] 
         return positions
     
