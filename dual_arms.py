@@ -753,6 +753,26 @@ class DualArmEnv:
     
     def reset(self):
         self.world.reset()
+        # set gravity
+        physics_scene_path = "/physicsScene"
+        physics_scene = self.stage.GetPrimAtPath(physics_scene_path)
+        # Ensure the Physics Scene prim is valid
+        if physics_scene.IsValid():
+            # Set the gravity direction (e.g., (0, 0, -1) for downward gravity along the Z-axis)
+            gravity_direction_attr = physics_scene.GetAttribute("physics:gravityDirection")
+            if not gravity_direction_attr:
+                gravity_direction_attr = physics_scene.CreateAttribute("physics:gravityDirection", Gf.Vec3f)
+            gravity_direction_attr.Set(Gf.Vec3f(0.0, 0.0, -1.0))
+
+            # Set the gravity magnitude (e.g., 9.81 for Earth's gravity)
+            gravity_magnitude_attr = physics_scene.GetAttribute("physics:gravityMagnitude")
+            if not gravity_magnitude_attr:
+                gravity_magnitude_attr = physics_scene.CreateAttribute("physics:gravityMagnitude", float)
+            gravity_magnitude_attr.Set(1.0)
+        else:
+            print(f"Physics Scene prim at {physics_scene_path} not found.")
+
+
         idx_list = [self.robot.get_dof_index(x) for x in self.j_names]
         # idx_list = [self.robot.get_dof_index(x) for x in self.j_names_primary]
         self.robot.set_joint_positions(self.default_config, idx_list)
@@ -1493,8 +1513,8 @@ class DualArmEnv:
         positions = js.position.cpu().numpy()
         for arm, gripper_primary_name in self.gripper_primary_joints_dict.items():
             idx = self.common_js_names.index(gripper_primary_name)
-            # positions[idx] = gripper_primary_pos_dict[gripper_primary_name] + 0.005 * self.gripper_closed[arm]
-            positions[idx] = gripper_primary_pos_dict[gripper_primary_name] 
+            positions[idx] = gripper_primary_pos_dict[gripper_primary_name] + 0.001 * self.gripper_closed[arm]
+            # positions[idx] = gripper_primary_pos_dict[gripper_primary_name] 
         return positions
     
     def get_current_arm_js(self):
