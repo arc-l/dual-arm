@@ -190,7 +190,7 @@ class DualArmEnv:
             # rotation_threshold=0.5,
             # position_threshold=0.5,
             finetune_trajopt_iters=500,
-            # high_precision=True,
+            high_precision=True,
         )
 
         self.single_motion_gen = MotionGen(single_motion_gen_config)
@@ -1726,12 +1726,12 @@ class DualArmEnv:
         self.ik_solver.update_world(self.world_cfg_curobo)
         print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
         print("       self.motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
-        mesh = self.single_motion_gen.world_coll_checker.get_mesh_in_bounding_box(
-            cuboid=Cuboid(name="test", dims=[2,2,2], pose=[0, 0, -0.1,1,0,0,0]),
-            voxel_size=0.01,
-            run_marching_cubes=True
-        )
-        mesh.save_as_mesh(file_path="results/scene.obj")
+        # mesh = self.single_motion_gen.world_coll_checker.get_mesh_in_bounding_box(
+        #     cuboid=Cuboid(name="test", dims=[2,2,2], pose=[0, 0, -0.1,1,0,0,0]),
+        #     voxel_size=0.01,
+        #     run_marching_cubes=True
+        # )
+        # mesh.save_as_mesh(file_path="results/scene.obj")
 
 
     def display(self, reset=False):

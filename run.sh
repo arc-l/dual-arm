@@ -7,7 +7,7 @@ DATA_DIR="data"
 for json_file in "$DATA_DIR"/*.json; do
     if [[ -f "$json_file" ]]; then
         echo "Running evaluation on $json_file..."
-        python evaluation.py --input "$json_file" --method baseline
+        python evaluation.py --input "$json_file" --method ours
         sleep 5
     else
         echo "No JSON files found in $DATA_DIR"
