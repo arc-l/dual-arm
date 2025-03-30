@@ -190,7 +190,7 @@ class DualArmEnv:
             # rotation_threshold=0.5,
             # position_threshold=0.5,
             finetune_trajopt_iters=500,
-            high_precision=True,
+            # high_precision=True,
         )
 
         self.single_motion_gen = MotionGen(single_motion_gen_config)
@@ -245,10 +245,11 @@ class DualArmEnv:
         self.single_plan_config = MotionGenPlanConfig(
             enable_graph=True,
             enable_graph_attempt=60,
-            max_attempts=30,
+            max_attempts=60,
             time_dilation_factor=0.5,
             pose_cost_metric=pose_metric,
-            ik_fail_return=100,
+            ik_fail_return=300,
+            num_ik_seeds=200,
             # fail_on_invalid_query=False,
         )
 
@@ -260,6 +261,11 @@ class DualArmEnv:
         self.recorded_plan = []
         self.old_task_plan = None
         self.pre_grasp_height = 2 * self.task.object_size
+        
+        self.preferred_angles = [901, 900]
+        self.preferred_angles_combination = list(product(self.preferred_angles, repeat=2))
+        self.all_angles = [901, 900, 450, -450, 451, -451]
+        self.all_angles_combination = list(product(self.all_angles, repeat=2))
         # end of init
 
 
@@ -899,17 +905,21 @@ class DualArmEnv:
         task_execution_result = TaskExecutionResult()
         needs_naive_plan = True #TODO: Remove this later
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
-            goal_arm1 = self.default_ee_pos[self.arm1]
+            goal_arm1 = self.default_ee_pos[self.arm1].copy()
         else:
             goal_arm1 = self.task.get_start( task_plan.arm1_assigned_object ) if task_plan.arm1_to_start else self.task.get_goal( task_plan.arm1_assigned_object )
         if task_plan.arm2_assigned_object == -1 or task_plan.arm2_assigned_object is None:
-            goal_arm2 = self.default_ee_pos[self.arm2]
+            goal_arm2 = self.default_ee_pos[self.arm2].copy()
         else:
             goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ) if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object )
         
         # safety pre_grasp
         goal_arm1[2] += self.pre_grasp_height
         goal_arm2[2] += self.pre_grasp_height
+        # if goal_arm1[2] >= self.default_ee_pos[self.arm1][2]+self.pre_grasp_height:
+        #     goal_arm1[2] -= self.pre_grasp_height
+        # if goal_arm2[2] >= self.default_ee_pos[self.arm2][2]+self.pre_grasp_height:
+        #     goal_arm2[2] -= self.pre_grasp_height
 
         task_execution_result.arm1_assigned_object = task_plan.arm1_assigned_object 
         task_execution_result.arm2_assigned_object = task_plan.arm2_assigned_object
@@ -1332,10 +1342,8 @@ class DualArmEnv:
     
     def find_available_task(self, task_plan: TaskPlan):
         # first, find the avaiable task that uses vertical pick and place
-        angles = [901, 900]
-        angles_combination = list(product(angles, repeat=2))
         print("finding vertical pick and place")
-        for combo in angles_combination:
+        for combo in self.preferred_angles_combination:
             for indices in task_plan.start_goal_pairs:
                 start1 = self.task.get_start( indices[0] )
                 goal1 = self.task.get_goal( indices[0] )
@@ -1352,10 +1360,8 @@ class DualArmEnv:
                     task_plan.arm2_angle = angle2
                     return 
         # if no solution with vertical pick and place, try other angles
-        angles = [901, 900, 450, -450, 451, -451]
-        angles_combination = list(product(angles, repeat=2))
         print("finding other angles")
-        for combo in angles_combination:
+        for combo in self.all_angles_combination:
             for indices in task_plan.start_goal_pairs:
                 start1 = self.task.get_start( indices[0] )
                 goal1 = self.task.get_goal( indices[0] )
@@ -1372,10 +1378,8 @@ class DualArmEnv:
                     task_plan.arm2_angle = angle2
                     return 
         # if still no solution, do it one by one
-        angles = [901, 900, 450, -450, 451, -451]
-        angles_combination = list(product(angles, repeat=2))
         print("finding one by one")
-        for combo in angles_combination:
+        for combo in self.all_angles_combination:
             for indices in task_plan.start_goal_pairs:
                 start1 = self.task.get_start( indices[0] )
                 goal1 = self.task.get_goal( indices[0] )
@@ -1399,11 +1403,9 @@ class DualArmEnv:
 
     
     def find_available_task_with_buffers(self, task_plan: TaskPlan):
-        angles = [901, 900, 450, -450, 451, -451]
-        angles_combination = list(product(angles, repeat=2))
         #TODO: make this buffer size configurable
         buffers = self.task.sample_buffers(10)
-        for combo in angles_combination:
+        for combo in self.preferred_angles_combination:
             for indices in task_plan.start_goal_pairs:
                 goal1_dependent_on_goal2 = self.task.is_direct_dependent(indices[0], indices[1])
                 start1 = self.task.get_start( indices[0] )
@@ -1463,9 +1465,8 @@ class DualArmEnv:
                 return 
                 
     def find_angle_for_single_arm(self, task_plan: TaskPlan, arm: str):
-        angles = [901, 900, 450, -450, 451, -451]
         if arm == self.arm1:
-            for angle in angles:
+            for angle in self.all_angles:
                 start1 = self.default_ee_pos[self.arm1]
                 goal1 = self.default_ee_pos[self.arm1]
                 angle2 = 900
@@ -1489,7 +1490,7 @@ class DualArmEnv:
                     return
         elif arm == self.arm2:
             #TODO: fix this
-            for angle in angles:
+            for angle in self.all_angles:
                 start1 = self.default_ee_pos[self.arm1]
                 goal1 = self.default_ee_pos[self.arm1]
                 start2 = self.default_ee_pos[self.arm2]
@@ -1513,9 +1514,7 @@ class DualArmEnv:
                     return
             
     def find_available_task_for_single_arm(self, task_plan: TaskPlan):
-        angles = [901, 900, 450, -450, 451, -451]
-        # angles = [900, 450, -450, 901]
-        for angle in angles:
+        for angle in self.all_angles:
             for indices in task_plan.start_goal_pairs:
                 start = self.task.get_start( indices[0] )
                 goal = self.task.get_goal( indices[1] )
@@ -1720,11 +1719,19 @@ class DualArmEnv:
         obs = cuboids + world_cfg_table.cuboid
         # self.world_cfg_curobo = WorldConfig(cuboid=obs, mesh=world_cfg1.mesh)
         self.world_cfg_curobo = WorldConfig(cuboid=obs)
+        self.motion_gen.clear_world_cache()
+        self.single_motion_gen.clear_world_cache()
         self.motion_gen.update_world(self.world_cfg_curobo)
         self.single_motion_gen.update_world(self.world_cfg_curobo)
         self.ik_solver.update_world(self.world_cfg_curobo)
         print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
         print("       self.motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
+        mesh = self.single_motion_gen.world_coll_checker.get_mesh_in_bounding_box(
+            cuboid=Cuboid(name="test", dims=[2,2,2], pose=[0, 0, -0.1,1,0,0,0]),
+            voxel_size=0.01,
+            run_marching_cubes=True
+        )
+        mesh.save_as_mesh(file_path="results/scene.obj")
 
 
     def display(self, reset=False):
