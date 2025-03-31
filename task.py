@@ -356,12 +356,11 @@ class Task:
             ax.set_xticks([])
             ax.set_yticks([])
 
-            for j in range(self.num_objects):
-                start = self.starts[j]
-                goal = self.goals[j]
-                color = self.colors[j]
-
-                if i == 0:  # Only start
+            if i == 0:  # Only start
+                for j in range(self.num_objects):
+                    start = self.starts[j]
+                    goal = self.goals[j]
+                    color = self.colors[j]
                     ax.add_patch(plt.Rectangle(
                         (start[0]-self.object_size/2, start[1]-self.object_size/2),
                         self.object_size,
@@ -370,7 +369,11 @@ class Task:
                         edgecolor='black',
                         alpha=1.0
                     ))
-                elif i == 1:  # Only goal
+            elif i == 1:  # Only goal
+                for j in range(self.num_objects):
+                    start = self.starts[j]
+                    goal = self.goals[j]
+                    color = self.colors[j]
                     ax.add_patch(plt.Rectangle(
                         (goal[0] - scaled_size/2, goal[1] - scaled_size/2),
                         scaled_size,
@@ -380,7 +383,10 @@ class Task:
                         hatch='/',
                         alpha=1.0
                     ))
-                else:  # Overlay both
+            else:  # Overlay both
+                for j in range(self.num_objects):
+                    goal = self.goals[j]
+                    color = self.colors[j]
                     ax.add_patch(plt.Rectangle(
                         (goal[0] - scaled_size/2, goal[1] - scaled_size/2),
                         scaled_size,
@@ -390,6 +396,9 @@ class Task:
                         hatch='/',
                         alpha=1.0
                     ))
+                for j in range(self.num_objects):
+                    start = self.starts[j]
+                    color = self.colors[j]
                     ax.add_patch(plt.Rectangle(
                         (start[0]-self.object_size/2, start[1]-self.object_size/2),
                         self.object_size,
