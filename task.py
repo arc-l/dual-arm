@@ -193,14 +193,12 @@ class Task:
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
     
-    def generate_fixed_cycled_objects(self, radius = None)->None:
+    def generate_fixed_cycled_objects(self)->None:
         self.starts = []
         self.goals = []
-        if radius is None:
-            radius = min(self.map_width, self.map_length)/2 - 2 * self.object_size
         for i in range(self.num_objects):
-            x = np.cos(2 * np.pi * i / self.num_objects) * radius
-            y = np.sin(2 * np.pi * i / self.num_objects) * radius
+            x = np.cos(2 * np.pi * i / self.num_objects) * (self.map_width/2- 2 * self.object_size)
+            y = np.sin(2 * np.pi * i / self.num_objects) * (self.map_length/2 - 2 * self.object_size)
             start = np.array([x, y, self.object_size/2])
             self.starts.append(start)
         for i in range(self.num_objects):
@@ -270,46 +268,39 @@ class Task:
         pos = np.array([x, y, self.object_size/2])
         return pos
     
-    def generate(self, cycled=False, min_dist=0.1) -> None:
-        """Generate random start and goal positions with optional cycling behavior and minimum pairwise distance."""
+    def generate(self, cycled=False) -> None:
+        """Generate random start and goal positions with optional cycling behavior."""
         self.starts = []
         self.goals = []
+
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         cnt = 0
 
-        def is_too_close(pos, others):
-            for other in others:
-                if np.linalg.norm(pos[:2] - other[:2]) < min_dist:  # only xy-plane matters
-                    return True
-            return False
-
-        all_positions = []
-
-        for _ in range(self.num_objects):
+        # Generate random unique start positions
+        for i in range(self.num_objects):
             start = self.random_position()
-            while is_too_close(start, all_positions):
+            while self.check_collision(self.starts, start):
                 start = self.random_position()
-                cnt += 1
                 if cnt > 1000:
-                    raise RuntimeError('Cannot generate task configuration with given minimum distance')
+                    raise RuntimeError('Cannot generate task configuration')
+                cnt += 1
             self.starts.append(start)
-            all_positions.append(start)
 
         if cycled:
+            # Create a cyclic goal configuration
             self.goals = self.starts[1:] + [self.starts[0]]
         else:
-            for _ in range(self.num_objects):
+            cnt = 0
+            for i in range(self.num_objects):
                 goal = self.random_position()
-                while is_too_close(goal, all_positions):
+                while self.check_collision(self.goals, goal):
                     goal = self.random_position()
-                    cnt += 1
                     if cnt > 1000:
-                        raise RuntimeError('Cannot generate task configuration with given minimum distance')
+                        raise RuntimeError('Cannot generate task configuration')
+                    cnt += 1
                 self.goals.append(goal)
-                all_positions.append(goal)
 
         self.init()
-
 
     def check_collision_between_cubes(self, pos1: np.ndarray, pos2: np.ndarray, clearance=0)->bool:
         # check if two rectangles are colliding
@@ -350,6 +341,73 @@ class Task:
         plt.ylim([-self.map_length/2., self.map_length/2.])
         plt.axis('equal') 
         plt.show()
+    
+    def draw_triptych(self, save_path: str):
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        titles = ['Start Positions', 'Goal Positions', 'Start & Goal Overlay']
+
+        for i, ax in enumerate(axes):
+            ax.set_xlim([-self.map_width / 2, self.map_width / 2])
+            ax.set_ylim([-self.map_length / 2, self.map_length / 2])
+            ax.set_aspect('equal')
+            ax.set_title(titles[i])
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+            for j in range(self.num_objects):
+                start = self.starts[j]
+                goal = self.goals[j]
+                color = self.colors[j]
+
+                if i == 0:  # Only start
+                    ax.add_patch(plt.Rectangle(
+                        (start[0], start[1]),
+                        self.object_size,
+                        self.object_size,
+                        facecolor=color,
+                        edgecolor='black',
+                        alpha=1.0
+                    ))
+                elif i == 1:  # Only goal
+                    ax.add_patch(plt.Rectangle(
+                        (goal[0], goal[1]),
+                        self.object_size,
+                        self.object_size,
+                        facecolor=color,
+                        edgecolor='black',
+                        hatch='/',
+                        alpha=1.0
+                    ))
+                else:  # Overlay both
+                    ax.add_patch(plt.Rectangle(
+                        (goal[0], goal[1]),
+                        self.object_size,
+                        self.object_size,
+                        facecolor=color,
+                        edgecolor='black',
+                        hatch='/',
+                        alpha=1.0
+                    ))
+                    ax.add_patch(plt.Rectangle(
+                        (start[0], start[1]),
+                        self.object_size,
+                        self.object_size,
+                        facecolor=color,
+                        edgecolor='black',
+                        alpha=0.6
+                    ))
+
+        # Shared legend
+        legend_elements = [
+            patches.Patch(facecolor='gray', edgecolor='black', label='Start'),
+            patches.Patch(facecolor='gray', edgecolor='black', hatch='/', label='Goal')
+        ]
+        axes[2].legend(handles=legend_elements, loc='lower right')
+
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Saved visualization to: {save_path}")
+        plt.close(fig)
     
     def get_starts(self):
         return self.starts
@@ -679,25 +737,26 @@ class Task:
         return task
 
 
-def generate_dataset(num_samples: int, min_dist: float, folder: str = 'data'):
+def generate_dataset(num_samples: int, folder: str = 'data'):
     if not os.path.exists(folder):
         os.makedirs(folder)
     
     for i in range(num_samples):
-        for num_objects in range(4, 10):
-            # Generate random configuration
-            task = Task(num_objects, 0.6, 0.6, 0.05)
-            task.generate(cycled=False, min_dist=min_dist)
-            filename = f"{folder}/task_random_{num_objects}_objects_{i}.json"
-            task.write_to_json(filename)
-            print(f"Saved: {filename}")
-            
-            # Generate cycled configuration
-            task = Task(num_objects, 0.6, 0.6, 0.05)
-            task.generate(cycled=True, min_dist=min_dist)
-            filename = f"{folder}/task_cycled_{num_objects}_objects_{i}.json"
-            task.write_to_json(filename)
-            print(f"Saved: {filename}")
+        num_objects = random.randint(2, 10)  # Randomize the number of objects between 2 and 10
+        
+        # Generate random configuration
+        task = Task(num_objects, 0.6, 0.6, 0.05)
+        task.generate(cycled=False)
+        filename = f"{folder}/task_random_{num_objects}_objects_{i}.json"
+        task.write_to_json(filename)
+        print(f"Saved: {filename}")
+        
+        # Generate cycled configuration
+        task = Task(num_objects, 0.6, 0.6, 0.05)
+        task.generate(cycled=True)
+        filename = f"{folder}/task_cycled_{num_objects}_objects_{i}.json"
+        task.write_to_json(filename)
+        print(f"Saved: {filename}")
 
 
 # debug
@@ -720,6 +779,6 @@ if __name__ == '__main__':
         task.generate_fixed_cycled_objects()
         task.write_to_json(f'data/task_fixed_cycled_{i}_objects.json')
     # Generate dataset
-    generate_dataset(2, 0.1, 'data')
+    generate_dataset(20.1, 'data')
 
 
