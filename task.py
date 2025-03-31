@@ -453,6 +453,8 @@ class Task:
         return len(self.idx_to_be_rearranged) == 0
 
     def plan(self):
+        # self.draw_dependency_graph("dependency_graph.png")
+        # self.draw_triptych("result.png")
         if self.all_arms_available():
             if len(self.dependency_graph.independent_sets) > 1:
                 # pick two independent sets
@@ -746,6 +748,67 @@ class Task:
         task.goals = [np.array(goal) for goal in data['goals']]
         task.init()
         return task
+    
+    def draw_dependency_graph(self, save_path: str):
+        """
+        Visualizes the dependency graph using the start positions.
+        
+        - Draws a rectangle for each object using its start position (centered).
+        - Annotates each rectangle with the object id.
+        - Draws arrows from interfering objects to the dependent object, using the start positions.
+        
+        The resulting image is saved to save_path.
+        """
+
+        # Create a figure and axis.
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.set_xlim([-self.map_width / 2, self.map_width / 2])
+        ax.set_ylim([-self.map_length / 2, self.map_length / 2])
+        ax.set_aspect('equal')
+        ax.set_title("Dependency Graph (Using Start Positions)")
+
+        # Draw patches for each object using the start positions.
+        # We assume self.start_dict contains keys = object id and value = start coordinate (as np.array)
+        for obj_id, start in self.start_dict.items():
+            cx, cy = start[0], start[1]
+            # Convert center to lower-left corner for the Rectangle patch
+            lower_left = (cx - self.object_size / 2, cy - self.object_size / 2)
+            color = self.colors[obj_id]
+            rect = patches.Rectangle(lower_left, self.object_size, self.object_size,
+                                    facecolor=color, edgecolor='black', alpha=1.0)
+            ax.add_patch(rect)
+            # Annotate the center of the rectangle with the object id.
+            ax.text(cx, cy, str(obj_id), color='black', fontsize=12,
+                    ha='center', va='center')
+
+        # Draw dependency arrows.
+        # The dependency graph is stored in self.dependency_graph.dependency_graph.
+        # For each dependent object, draw an arrow from each interfering object's start to the dependent's start.
+        dep_graph = self.dependency_graph.dependency_graph
+        for dependent, interfering_set in dep_graph.items():
+            # Check that the dependent object exists in start_dict
+            if dependent not in self.start_dict:
+                continue
+            dest = self.start_dict[dependent]
+            dest_center = (dest[0], dest[1])
+            for interfering in interfering_set:
+                if interfering not in self.start_dict:
+                    continue
+                source = self.start_dict[interfering]
+                source_center = (source[0], source[1])
+                # Draw an arrow from the interfering object (source) to the dependent object (destination)
+                ax.annotate("",
+                            xy=dest_center, xycoords='data',
+                            xytext=source_center, textcoords='data',
+                            arrowprops=dict(arrowstyle="->", color='black', lw=1.5))
+
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Saved dependency graph visualization to: {save_path}")
+        plt.close(fig)
+
+
+
 
 
 def generate_dataset(num_samples: int, folder: str = 'data'):
@@ -771,25 +834,28 @@ def generate_dataset(num_samples: int, folder: str = 'data'):
 
 
 # debug
-if __name__ == '__main1__':
+if __name__ == '__main__':
     # make folder for the data if the folder does not exist
     # debug the whole process
-    if not os.path.exists('data'):
-        os.makedirs('data')
-    task = Task(10, 0.6, 0.6, 0.05)
-    task.generate()
-    task.write_to_json('data/task.json')
+    # if not os.path.exists('data'):
+    #     os.makedirs('data')
+    # task = Task(10, 0.6, 0.6, 0.05)
+    # task.generate()
+    # task.write_to_json('data/task.json')
     
-    task1 = Task.read_from_json('data/task.json')
-    task1.draw()
-    print(task1.get_starts())
-    print(task1.get_goals())
+    # task1 = Task.read_from_json('data/task.json')
+    # task1.draw()
+    # print(task1.get_starts())
+    # print(task1.get_goals())
 
-    for i in range(2, 11):
-        task = Task(i, 0.6, 0.6, 0.05)
-        task.generate_fixed_cycled_objects()
-        task.write_to_json(f'data/task_fixed_cycled_{i}_objects.json')
-    # Generate dataset
-    generate_dataset(20.1, 'data')
+    # for i in range(2, 11):
+    #     task = Task(i, 0.6, 0.6, 0.05)
+    #     task.generate_fixed_cycled_objects()
+    #     task.write_to_json(f'data/task_fixed_cycled_{i}_objects.json')
+    # # Generate dataset
+    # generate_dataset(20.1, 'data')
 
 
+    task = Task.read_from_json('data/task_2_cycle.json')
+    task.draw_triptych('result.png')
+    task.draw_dependency_graph('dependency_graph.png')

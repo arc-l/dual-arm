@@ -116,27 +116,41 @@ class DependencyGraph:
     
     def find_all_chains(self):
         """
-        Returns all distinct chains (linear dependency paths) in a directed graph.
-        :param dependency_graph: Dictionary representing the adjacency list with integer node IDs.
-        :return: A list of chains, where each chain is a list of node IDs.
+        Returns all distinct chains (linear dependency paths) in the dependency graph
+        that do NOT include any nodes that are part of a cycle.
+        
+        Chains that include cycle nodes are not returned (because cycles should be handled first).
         """
         chains = []
         visited = set()
 
-        def dfs(node, path, visited):
-            if node in path:  # Detect cycle and stop recursion
+        # Compute the set of all nodes that belong to any cycle.
+        cycles = self.find_all_cycles()
+        cycle_nodes = set()
+        for cyc in cycles:
+            # In case cycles are returned as lists
+            if isinstance(cyc, list):
+                cycle_nodes.update(cyc)
+            else:
+                cycle_nodes.add(cyc)
+
+        def dfs(node, path):
+            if node in path:  # A cycle is detected; abort this branch.
                 return
             path.append(node)
             visited.add(node)
-            if not self.dependency_graph.get(node, []) and len(path) > 1:  # If no outgoing edges, store the complete chain
-                chains.append(path[:])
+            # If node has no outgoing edges (i.e. terminal) and path length > 1, consider it a complete chain.
+            # Only add the chain if none of its nodes are in a cycle.
+            if not self.dependency_graph.get(node, []) and len(path) > 1:
+                if not set(path).intersection(cycle_nodes):
+                    chains.append(path[:])
             else:
-                for neighbor in self.dependency_graph[node]:
-                    dfs(neighbor, path, visited)
+                for neighbor in self.dependency_graph.get(node, []):
+                    dfs(neighbor, path)
             path.pop()
 
         for node in self.dependency_graph:
-            if node not in visited:  # Start only from unvisited nodes
-                dfs(node, [], visited)
+            if node not in visited:
+                dfs(node, [])
 
         return chains

@@ -81,11 +81,13 @@ class DualArmEnv:
                  batch_size: int = 3,
                  constrain_grasp_approach: bool = False,
                  visualize_spheres: bool = False,
+                 num_buffers: int = 20,
                  ):
         self.simulation_app = simulation_app
         self.task = task
         self.spheres = None
         self.visualize_spheres = visualize_spheres
+        self.num_buffers = num_buffers
         self.spheres = None
         self.world = World(stage_units_in_meters=1.0)
         self.stage = self.world.stage
@@ -907,11 +909,11 @@ class DualArmEnv:
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
         else:
-            goal_arm1 = self.task.get_start( task_plan.arm1_assigned_object ) if task_plan.arm1_to_start else self.task.get_goal( task_plan.arm1_assigned_object )
+            goal_arm1 = self.task.get_start( task_plan.arm1_assigned_object ).copy() if task_plan.arm1_to_start else self.task.get_goal( task_plan.arm1_assigned_object ).copy()
         if task_plan.arm2_assigned_object == -1 or task_plan.arm2_assigned_object is None:
             goal_arm2 = self.default_ee_pos[self.arm2].copy()
         else:
-            goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ) if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object )
+            goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ).copy() if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object ).copy()
         
         # safety pre_grasp
         goal_arm1[2] += self.pre_grasp_height
@@ -1404,7 +1406,7 @@ class DualArmEnv:
     
     def find_available_task_with_buffers(self, task_plan: TaskPlan):
         #TODO: make this buffer size configurable
-        buffers = self.task.sample_buffers(10)
+        buffers = self.task.sample_buffers(self.num_buffers)
         for combo in self.preferred_angles_combination:
             for indices in task_plan.start_goal_pairs:
                 goal1_dependent_on_goal2 = self.task.is_direct_dependent(indices[0], indices[1])

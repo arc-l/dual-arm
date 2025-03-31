@@ -29,7 +29,8 @@
             "console": "integratedTerminal",
             "args": [
                 "--input",
-                "data/task_cycled_10_objects_1.json",
+                "data/task_2_cycle.json",
+                // "data/task_cycled_4_objects_0.json",
                 "--method",
                 "ours"
             ]
