@@ -345,6 +345,8 @@ class Task:
     def draw_triptych(self, save_path: str):
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         titles = ['Start Positions', 'Goal Positions', 'Start & Goal Overlay']
+        goal_scale = 1.2
+        scaled_size = self.object_size * goal_scale
 
         for i, ax in enumerate(axes):
             ax.set_xlim([-self.map_width / 2, self.map_width / 2])
@@ -361,7 +363,7 @@ class Task:
 
                 if i == 0:  # Only start
                     ax.add_patch(plt.Rectangle(
-                        (start[0], start[1]),
+                        (start[0]-self.object_size/2, start[1]-self.object_size/2),
                         self.object_size,
                         self.object_size,
                         facecolor=color,
@@ -370,9 +372,9 @@ class Task:
                     ))
                 elif i == 1:  # Only goal
                     ax.add_patch(plt.Rectangle(
-                        (goal[0], goal[1]),
-                        self.object_size,
-                        self.object_size,
+                        (goal[0] - scaled_size/2, goal[1] - scaled_size/2),
+                        scaled_size,
+                        scaled_size,
                         facecolor=color,
                         edgecolor='black',
                         hatch='/',
@@ -380,21 +382,21 @@ class Task:
                     ))
                 else:  # Overlay both
                     ax.add_patch(plt.Rectangle(
-                        (goal[0], goal[1]),
-                        self.object_size,
-                        self.object_size,
+                        (goal[0] - scaled_size/2, goal[1] - scaled_size/2),
+                        scaled_size,
+                        scaled_size,
                         facecolor=color,
                         edgecolor='black',
                         hatch='/',
                         alpha=1.0
                     ))
                     ax.add_patch(plt.Rectangle(
-                        (start[0], start[1]),
+                        (start[0]-self.object_size/2, start[1]-self.object_size/2),
                         self.object_size,
                         self.object_size,
                         facecolor=color,
                         edgecolor='black',
-                        alpha=0.6
+                        alpha=0.95
                     ))
 
         # Shared legend
@@ -760,7 +762,7 @@ def generate_dataset(num_samples: int, folder: str = 'data'):
 
 
 # debug
-if __name__ == '__main__':
+if __name__ == '__main1__':
     # make folder for the data if the folder does not exist
     # debug the whole process
     if not os.path.exists('data'):
