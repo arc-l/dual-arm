@@ -1536,12 +1536,6 @@ class DualArmEnv:
             load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
         )
         world_cfg_table.cuboid[0].pose[2] -= 0.02
-        # world_cfg1 = WorldConfig.from_dict(
-        #     load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
-        # ).get_mesh_world()
-        # world_cfg1.mesh[0].name += "_mesh"
-        # world_cfg1.mesh[0].pose[2] = -10.5
-        # self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid, mesh=world_cfg1.mesh)
         self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid)
         obs = cuboids + world_cfg_table.cuboid
         # self.world_cfg_curobo = WorldConfig(cuboid=obs, mesh=world_cfg1.mesh)
@@ -1596,15 +1590,8 @@ class DualArmEnv:
         curr_js = curr_js.get_ordered_joint_state(self.common_js_names)
         start_js = curr_js.position.squeeze(0).view(-1)
         goal_js = ik_result.js_solution.get_ordered_joint_state(self.common_js_names).position.squeeze(0).view(-1)
-        # idx_list = [self.robot.get_dof_index(x) for x in self.common_js_names]
-        # goal_js_display = goal_js.cpu().tolist()
-        # self.robot.set_joint_positions(goal_js_display, idx_list)
-        # self.robot.set_joint_velocities(np.zeros(len(idx_list)), idx_list)
-        # for _ in range(100):
-        #     self.world.step(render=True)
         traj = self.interpolate_joint_states(curr_js.position, goal_js)
         cmd_plan = JointState.from_position(traj, self.common_js_names)
-        # self.visualize_plan(cmd_plan)
         return cmd_plan
     
     def move_z(self, delta, angle1, angle2):
