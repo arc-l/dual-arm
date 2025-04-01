@@ -149,28 +149,6 @@ class DualArmEnv:
         # ik_seed = np.random.randint(0, 10000)
         # graph_seed = np.random.randint(0, 10000)
 
-        motion_gen_config = MotionGenConfig.load_from_robot_config(
-            self.robot_cfg,
-            self.world_cfg_curobo,
-            self.tensor_args,
-            collision_checker_type=CollisionCheckerType.PRIMITIVE,
-            # collision_checker_type=CollisionCheckerType.MESH,
-            use_cuda_graph=True,
-            interpolation_dt=self.interpolation_dt,
-            collision_cache={"obb": 2 * len(obs), "mesh": 2 * len(obs)},
-            collision_activation_distance=0.025,
-            fixed_iters_trajopt=True,
-            maximum_trajectory_dt=0.5,
-            num_graph_seeds=1,
-            num_ik_seeds=100,
-            num_batch_ik_seeds=32,
-            num_trajopt_seeds= 32,
-            trajopt_tsteps=64,
-            finetune_trajopt_iters=500,
-        )
-
-        self.motion_gen = MotionGen(motion_gen_config)
-
         single_motion_gen_config = MotionGenConfig.load_from_robot_config(
             self.robot_cfg,
             self.world_cfg_curobo,
@@ -443,8 +421,7 @@ class DualArmEnv:
             position=self.tensor_args.to_device(c_p),
             quaternion=self.tensor_args.to_device(c_rot),
         )
-        result = self.motion_gen.plan_single(
-            # cu_js.unsqueeze(0), ik_goal, self.plan_config.clone(), 
+        result = self.single_motion_gen.plan_single(
             cu_js, ik_goal, self.plan_config.clone(), 
             link_poses=link_poses
         )
@@ -732,7 +709,6 @@ class DualArmEnv:
         self.add_objects_isaacsim()
         self.sync_isaacsim_curobo()
         print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
-        print("       self.motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
     
     def add_objects_isaacsim(self):
         starts = self.task.get_starts()
@@ -792,8 +768,20 @@ class DualArmEnv:
                 obj_prim=prims_utils.get_prim_at_path(f"/ur5e_robot/{path}")
             )
         
-    def motion_plan(self, task_plan: TaskPlan):
+    def get_task_execution_result(self, task_plan: TaskPlan):
         task_execution_result = TaskExecutionResult()
+        task_execution_result.arm1_assigned_object = task_plan.arm1_assigned_object 
+        task_execution_result.arm2_assigned_object = task_plan.arm2_assigned_object
+        task_execution_result.arm1_gripper_state = GripperState(task_plan.arm1_gripper_action.value)
+        task_execution_result.arm2_gripper_state = GripperState(task_plan.arm2_gripper_action.value)
+        task_execution_result.arm1_angle = task_plan.arm1_angle
+        task_execution_result.arm2_angle = task_plan.arm2_angle
+        task_execution_result.arm1_task_state = TaskState.IN_PROGRESS if task_plan.arm1_to_start else TaskState.COMPLETED
+        task_execution_result.arm2_task_state = TaskState.IN_PROGRESS if task_plan.arm2_to_start else TaskState.COMPLETED
+        task_execution_result.buffer = task_plan.buffer
+        return task_execution_result
+
+    def motion_plan(self, task_plan: TaskPlan):
         needs_naive_plan = True #TODO: Remove this later
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
@@ -812,15 +800,7 @@ class DualArmEnv:
         # if goal_arm2[2] >= self.default_ee_pos[self.arm2][2]+self.pre_grasp_height:
         #     goal_arm2[2] -= self.pre_grasp_height
 
-        task_execution_result.arm1_assigned_object = task_plan.arm1_assigned_object 
-        task_execution_result.arm2_assigned_object = task_plan.arm2_assigned_object
-        task_execution_result.arm1_gripper_state = GripperState(task_plan.arm1_gripper_action.value)
-        task_execution_result.arm2_gripper_state = GripperState(task_plan.arm2_gripper_action.value)
-        task_execution_result.arm1_angle = task_plan.arm1_angle
-        task_execution_result.arm2_angle = task_plan.arm2_angle
-        task_execution_result.arm1_task_state = TaskState.IN_PROGRESS if task_plan.arm1_to_start else TaskState.COMPLETED
-        task_execution_result.arm2_task_state = TaskState.IN_PROGRESS if task_plan.arm2_to_start else TaskState.COMPLETED
-        task_execution_result.buffer = task_plan.buffer
+        task_execution_result = self.get_task_execution_result(task_plan)
 
         if task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object is not None and not needs_naive_plan:
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
@@ -1016,37 +996,34 @@ class DualArmEnv:
             self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
     
+    def task_plan(self):
+        task_plan = self.task.plan()
+        if task_plan.start_goal_pairs is not None and not task_plan.use_buffer:
+            print("Pick two from the start_goal_pairs")
+            self.find_available_task(task_plan)
+        elif task_plan.use_buffer:
+            print("Using buffer for one arm")
+            self.find_available_task_with_buffers(task_plan)
+        elif task_plan.start_goal_pairs is None:
+            print("Start and Goal pairs are None")
+            if task_plan.arm2_assigned_object is not None and task_plan.arm1_assigned_object == -1:
+                print("Finishing up for one arm2")
+                if task_plan.arm2_angle is None:
+                    self.find_angle_for_single_arm(task_plan, self.arm2)
+            elif task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object == -1:  
+                print("Finishing up for one arm1")
+                if task_plan.arm1_angle is None:
+                    self.find_angle_for_single_arm(task_plan, self.arm1)
+            # elif (not task_plan.arm1_to_start) and (not task_plan.arm2_to_start):
+            else:
+                print("Finishing up for both arms")
+        return task_plan
 
     def plan(self, autostart=False):
         self.get_ready(reset=True, autostart=autostart)
         while not self.task.finished():
-            task_plan = self.task.plan()
-            task_execution_result = TaskExecutionResult()
-            if task_plan.start_goal_pairs is not None and not task_plan.use_buffer:
-                print("Pick two from the start_goal_pairs")
-                self.find_available_task(task_plan)
-                task_execution_result = self.motion_plan(task_plan)
-            elif task_plan.use_buffer:
-                print("Using buffer for one arm")
-                self.find_available_task_with_buffers(task_plan)
-                task_execution_result = self.motion_plan(task_plan)
-            elif task_plan.start_goal_pairs is None:
-                print("Start and Goal pairs are None")
-                if task_plan.arm2_assigned_object is not None and task_plan.arm1_assigned_object == -1:
-                    print("Finishing up for one arm2")
-                    if task_plan.arm2_angle is None:
-                        self.find_angle_for_single_arm(task_plan, self.arm2)
-                    task_execution_result = self.motion_plan(task_plan)
-                elif task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object == -1:  
-                    print("Finishing up for one arm1")
-                    if task_plan.arm1_angle is None:
-                        self.find_angle_for_single_arm(task_plan, self.arm1)
-                    task_execution_result = self.motion_plan(task_plan)
-                # elif (not task_plan.arm1_to_start) and (not task_plan.arm2_to_start):
-                else:
-                    print("Finishing up for both arms")
-                    task_execution_result = self.motion_plan(task_plan)
-            
+            task_plan = self.task_plan()
+            task_execution_result = self.motion_plan(task_plan)
             idx_to_sync = list(range(self.task.num_objects))
             sync_after_open = False
             sync_before_close = False
@@ -1092,6 +1069,15 @@ class DualArmEnv:
             self.task.update(task_execution_result)
         return self.recorded_plan
     
+    def plan_all(self):
+        while not self.task.finished():
+            task_plan = self.task_plan()
+            task_execution_result = self.get_task_execution_result(task_plan)
+            # we need to assume the motion planning has succeeded and update the start to goal in the curobo world_cfg
+
+            self.task.update(task_execution_result)
+
+    
     def check_object_collision_enabled(self):
         print("Single_motion_gen")
         for obj in self.objects_curobo:
@@ -1099,12 +1085,6 @@ class DualArmEnv:
             env_idx = 0
             obs_idx = self.single_motion_gen.world_coll_checker.get_obb_idx(name, env_idx)
             print(f"{name} single_motion_gen collision enabled = ", self.single_motion_gen.world_coll_checker._cube_tensor_list[2][env_idx, obs_idx].cpu().numpy(), end=' ') 
-        print()
-        for obj in self.objects_curobo:
-            name = obj.name
-            env_idx = 0
-            obs_idx = self.single_motion_gen.world_coll_checker.get_obb_idx(name, env_idx)
-            print(f"{name} motion_gen collision enabled = ", self.motion_gen.world_coll_checker._cube_tensor_list[2][env_idx, obs_idx].cpu().numpy())
         print()
 
     def get_current_js(self):
@@ -1364,18 +1344,6 @@ class DualArmEnv:
     def get_robot_dof_indices(self, joint_names: list):
         return [self.robot.get_dof_index(name) for name in joint_names]
 
-    def get_plan_batch(self, cmd_plan):
-        cmd_plan = self.motion_gen.get_full_js(cmd_plan)
-        # get only joint names that are in both:
-        if self.common_js_names == [] and self.common_js_indices == []:
-            for x in self.dof_names:
-                if x in cmd_plan.joint_names:
-                    self.common_js_indices.append(self.robot.get_dof_index(x))
-                    self.common_js_names.append(x)
-    
-        cmd_plan = cmd_plan.get_ordered_joint_state(self.common_js_names)
-        return cmd_plan
-
     def get_plan_single(self, result: MotionGenResult):
         cmd_plan = result.get_interpolated_plan()
         cmd_plan = self.single_motion_gen.get_full_js(cmd_plan)
@@ -1411,23 +1379,21 @@ class DualArmEnv:
         cube_name: str,
         arm_name: str
     ) -> None:
-        for mg in [self.single_motion_gen, self.motion_gen]:
-            mg.attach_objects_to_robot(
-                cu_js,
-                [cube_name],
-                sphere_fit_type=SphereFitType.VOXEL_VOLUME_SAMPLE_SURFACE,
-                # sphere_fit_type=SphereFitType.SAMPLE_SURFACE,
-                # world_objects_pose_offset=Pose.from_list([0, 0, 0.01, 1, 0, 0, 0], self.tensor_args),
-                link_name=arm_name
-            )
-            mg.world_coll_checker.enable_obstacle(enable=False, name=cube_name)
+        self.single_motion_gen.attach_objects_to_robot(
+            cu_js,
+            [cube_name],
+            sphere_fit_type=SphereFitType.VOXEL_VOLUME_SAMPLE_SURFACE,
+            # sphere_fit_type=SphereFitType.SAMPLE_SURFACE,
+            # world_objects_pose_offset=Pose.from_list([0, 0, 0.01, 1, 0, 0, 0], self.tensor_args),
+            link_name=arm_name
+        )
+        self.single_motion_gen.world_coll_checker.enable_obstacle(enable=False, name=cube_name)
         if self.visualize_spheres:
             self.visualize_robot_spheres()
 
     def detach_obj(self, arm_name: str, cube_name: str) -> None:
-        for mg in [self.single_motion_gen, self.motion_gen]:
-            mg.detach_object_from_robot(link_name=arm_name)
-            mg.world_coll_checker.enable_obstacle(enable=True, name=cube_name)
+        self.single_motion_gen.detach_object_from_robot(link_name=arm_name)
+        self.single_motion_gen.world_coll_checker.enable_obstacle(enable=True, name=cube_name)
         if self.visualize_spheres:
             self.visualize_robot_spheres()
 
@@ -1540,19 +1506,18 @@ class DualArmEnv:
         obs = cuboids + world_cfg_table.cuboid
         # self.world_cfg_curobo = WorldConfig(cuboid=obs, mesh=world_cfg1.mesh)
         self.world_cfg_curobo = WorldConfig(cuboid=obs)
-        self.motion_gen.clear_world_cache()
         self.single_motion_gen.clear_world_cache()
-        self.motion_gen.update_world(self.world_cfg_curobo)
         self.single_motion_gen.update_world(self.world_cfg_curobo)
         self.ik_solver.update_world(self.world_cfg_curobo)
         print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
-        print("       self.motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
-        # mesh = self.single_motion_gen.world_coll_checker.get_mesh_in_bounding_box(
-        #     cuboid=Cuboid(name="test", dims=[2,2,2], pose=[0, 0, -0.1,1,0,0,0]),
-        #     voxel_size=0.01,
-        #     run_marching_cubes=True
-        # )
-        # mesh.save_as_mesh(file_path="results/scene.obj")
+    
+    def save_scene_as_mesh(self):
+        mesh = self.single_motion_gen.world_coll_checker.get_mesh_in_bounding_box(
+            cuboid=Cuboid(name="test", dims=[2,2,2], pose=[0, 0, -0.1,1,0,0,0]),
+            voxel_size=0.01,
+            run_marching_cubes=True
+        )
+        mesh.save_as_mesh(file_path="results/scene.obj")
 
 
     def display(self, reset=False):
