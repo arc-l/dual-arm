@@ -457,7 +457,6 @@ class DualArmEnv:
         gripper_positions = sim_js.positions[self.gripper_primary_indices]
         return dict(zip(self.gripper_primary_joints, gripper_positions))
     
-
     def gripper_control(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
         dof_upper = self.robot.dof_properties["upper"]
         gripper_closed_pos = dof_upper[self.gripper_primary_indices[0]]
@@ -489,24 +488,6 @@ class DualArmEnv:
                 break
             old_gripper_positions = new_gripper_positions
 
-    
-    def test_gripper_close_open(self):
-        """
-            Test the gripper closing
-        """
-        self.get_ready()
-        for i in range(5):
-            self.close_gripper(True, False)
-            self.open_gripper(True, False)
-        
-        for i in range(5):
-            self.close_gripper(False, True)
-            self.open_gripper(False, True)
-        
-        for i in range(5):
-            self.close_gripper(True, True)
-            self.open_gripper(True, True)
-    
     def test_gripper_control(self):
         self.get_ready()
         for i in range(3):
