@@ -398,113 +398,6 @@ class DualArmEnv:
             link_poses=link_poses,
         )
         return ik_results
-    
-
-    def plan_batch_from_curr_js_all(self, goal_arm1, goal_arm2, angle1=900, angle2=900, prioritize_arm1=True):
-        if not self.simulation_app.is_running():
-            raise Exception("Simulation is not running")
-
-        self.world.step(render=True)
-
-        ik_goal1, ik_goal2 = self.get_grid_goal_poses(goal_arm1, goal_arm2, angle1, angle2, prioritize_arm1)
-
-        # filter out valid goals with feasible IKs
-
-        ik_results = self.ik_solve_batch(ik_goal1=ik_goal1, ik_goal2=ik_goal2)
-        ik_goal1 = ik_goal1[torch.where(ik_results.success)[0]]
-        ik_goal2 = ik_goal2[torch.where(ik_results.success)[0]]
-
-        sim_js = self.robot.get_joints_state()
-        sim_js_positions = sim_js.positions.reshape(1, -1)
-        # repeat cu_js
-        cu_js = JointState.from_position(self.tensor_args.to_device(sim_js_positions), self.dof_names)
-        cu_js = cu_js.get_ordered_joint_state(self.motion_gen.kinematics.joint_names)
-        cu_js = JointState.from_position(cu_js.position.repeat(ik_goal1.position.shape[0], 1), self.dof_names)
-        
-        link_poses = {}
-        link_poses[self.arm2] = ik_goal2
-        results = self.motion_gen.plan_batch(
-            cu_js,
-            ik_goal1,
-            self.plan_config.clone(),
-            link_poses=link_poses,
-            )
-
-        print("plan time: ", results.solve_time)
-        print("succeeded:", torch.count_nonzero(results.success).item(), " out of ", len(results.success))
-        return results
-    
-    def plan_batch_from_curr_js(self, goal_arm1, goal_arm2, angle1=900, angle2=900, prioritize_arm1=True):
-        results = self.plan_batch_from_curr_js_all(goal_arm1, goal_arm2, angle1, angle2, prioritize_arm1=prioritize_arm1)
-        if results.success[0]:
-            print("Original Plan successful")
-            return results.optimized_plan[0]
-        else:
-            print("Picking a random successful plan")
-            # randomly pick one from the successful ones
-            success_indices = torch.where(results.success)[0]
-            if len(success_indices) == 0:
-                return None
-            idx = random.choice(success_indices)
-            return results.optimized_plan[idx]
-
-    def test_plan_batch(self):
-        self.get_ready()
-        
-        cube = self.objects_isaacsim_dynamic[0]
-        c_p1, _ = cube.get_world_pose()
-        cube = self.objects_isaacsim_dynamic[1]
-        c_p2, _ = cube.get_world_pose()
-
-        results = self.plan_batch_from_curr_js_all(c_p1, c_p2)
-        for i in range(len(results.success)):
-            if results.success[i]:
-                cmd_plan = results.optimized_plan[i]
-                cmd_plan = self.motion_gen.get_full_js(cmd_plan)
-                # get only joint names that are in both:
-                if self.common_js_names == [] and self.common_js_indices == []:
-                    for x in self.dof_names:
-                        if x in cmd_plan.joint_names:
-                            self.common_js_indices.append(self.robot.get_dof_index(x))
-                            self.common_js_names.append(x)
-                
-                cmd_plan = cmd_plan.get_ordered_joint_state(self.common_js_names)
-                cmd_idx = 0
-                reached = False
-
-                while self.simulation_app.is_running():
-                    self.world.step(render=True)
-                    # if torch.any(results.success):
-                    cmd_state = cmd_plan[cmd_idx]
-                    # get full dof state
-                    # positions, velocities = self.get_joint_positions_with_static_gripper(cmd_state)
-                    gripper_primary_pos_dict = self.get_primary_gripper_position_dict()
-                    positions = cmd_state.position.cpu().numpy()
-                    for gripper_primary_name in self.gripper_primary_joints:
-                        idx = self.common_js_names.index(gripper_primary_name)
-                        positions[idx] = gripper_primary_pos_dict[gripper_primary_name]
-
-                    velocities = cmd_state.velocity.cpu().numpy()
-                    art_action = ArticulationAction(
-                        joint_positions=positions,
-                        joint_velocities=velocities,
-                        joint_indices=self.common_js_indices
-                    )
-
-                    # set desired joint angles obtained from IK:
-                    self.articulation_controller.apply_action(art_action)
-                    cmd_idx += 1
-                    for _ in range(2):
-                        self.world.step(render=False)
-                    if cmd_idx >= len(cmd_plan.position):
-                        cmd_idx = 0
-                        cmd_plan = None
-                        reached = True
-                        break
-                
-                    # if reached and not self.gripper_closed:
-                    #     self.close_gripper()
-                    #     return
 
 
     def plan_single_from_curr_js(self, goal_arm1, goal_arm2, arm_angle1, arm_angle2):
@@ -557,10 +450,6 @@ class DualArmEnv:
         )
         return result
 
-    
-    def draw_task_config(self):
-        self.task.draw()
-    
     def get_max_joint_velocity(self):
         sim_js = self.robot.get_joints_state()
         velocities = sim_js.velocities
@@ -1128,70 +1017,6 @@ class DualArmEnv:
             self.visualize_plan(cmd_plan)
     
 
-    def batch_motion_plan(self, task_plan):
-        task_execution_result = TaskExecutionResult()
-        # if no available task found for both arms, sample intermediate goals for one arm
-        angle1 = task_plan.arm1_angle
-        angle2 = task_plan.arm2_angle
-        if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
-            goal_arm1 = self.default_ee_pos[self.arm1]
-        else:
-            goal_arm1 = self.task.get_start( task_plan.arm1_assigned_object ) if task_plan.arm1_to_start else self.task.get_goal( task_plan.arm1_assigned_object )
-        if task_plan.arm2_assigned_object == -1 or task_plan.arm2_assigned_object is None:
-            goal_arm2 = self.default_ee_pos[self.arm2]
-        else:
-            goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ) if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object )
-        prioritize_arm1 = task_plan.prioritize_arm1
-        results = self.plan_batch_from_curr_js_all(goal_arm1, goal_arm2, angle1, angle2, prioritize_arm1=prioritize_arm1)
-        if results.success[0]:
-            print("Original Plan successful")
-            task_execution_result.arm1_task_state = TaskState.IN_PROGRESS if task_plan.arm1_to_start else TaskState.COMPLETED
-            task_execution_result.arm2_task_state = TaskState.IN_PROGRESS if task_plan.arm2_to_start else TaskState.COMPLETED
-            cmd_plan = results.optimized_plan[0]
-            cmd_plan = self.get_plan_batch(cmd_plan)
-        else:
-            print("Picking a random successful plan")
-            # randomly pick one from the successful ones
-            success_indices = torch.where(results.success)[0]
-            if len(success_indices) == 0:
-                return
-            idx = random.choice(success_indices)
-            # cmd_plan = results.optimized_plan[idx]
-            # cmd_plan = self.get_plan_batch(cmd_plan)
-            result = MotionGenResult(
-                success=True,
-                optimized_plan=results.optimized_plan[idx],
-                optimized_dt=results.optimized_dt[idx],
-                position_error=results.position_error[idx],
-                interpolated_plan=results.interpolated_plan[idx],
-                interpolation_dt=results.interpolation_dt,
-                path_buffer_last_tstep=[results.path_buffer_last_tstep[idx]],
-            )
-            result.retime_trajectory(time_dilation_factor=0.5)
-            cmd_plan = self.get_plan_single(result)
-            if prioritize_arm1:
-                task_execution_result.arm1_task_state = TaskState.IN_PROGRESS if task_plan.arm1_to_start else TaskState.COMPLETED
-                task_execution_result.arm2_task_state = TaskState.IN_PROGRESS
-                task_execution_result.arm2_at_intermediate = True
-                task_execution_result.arm1_at_intermediate = False
-                task_plan.arm2_gripper_action = task_plan.arm2_gripper_action.reverse()
-                print("Prioritizing arm1, reversing arm2 gripper action")
-            else:
-                task_execution_result.arm1_task_state = TaskState.IN_PROGRESS 
-                task_execution_result.arm2_task_state = TaskState.IN_PROGRESS if task_plan.arm2_to_start else TaskState.COMPLETED
-                task_execution_result.arm1_at_intermediate = True
-                task_execution_result.arm2_at_intermediate = False
-                task_plan.arm1_gripper_action = task_plan.arm1_gripper_action.reverse()
-                print("Prioritizing arm2, reversing arm1 gripper action")
-        task_execution_result.arm1_assigned_object = task_plan.arm1_assigned_object 
-        task_execution_result.arm2_assigned_object = task_plan.arm2_assigned_object
-        task_execution_result.arm1_gripper_state = GripperState(task_plan.arm1_gripper_action.value)
-        task_execution_result.arm2_gripper_state = GripperState(task_plan.arm2_gripper_action.value)
-        task_execution_result.arm1_angle = task_plan.arm1_angle
-        task_execution_result.arm2_angle = task_plan.arm2_angle
-        task_execution_result.buffer = task_plan.buffer
-        return cmd_plan, task_execution_result
-    
     def plan(self, autostart=False):
         self.get_ready(reset=True, autostart=autostart)
         while not self.task.finished():
@@ -1786,8 +1611,6 @@ class DualArmEnv:
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
-        print("move_z: pos1 = ", pos1, "pos2 = ", pos2)
-        pos1[2] += delta
         pos2[2] += delta
         return self.move_ee(pos1, angle1, pos2, angle2)
     
@@ -1795,7 +1618,6 @@ class DualArmEnv:
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
-        print("move_z: pos1 = ", pos1, "pos2 = ", pos2)
         pos1[2] += delta1
         pos2[2] += delta2
         return self.move_ee(pos1, angle1, pos2, angle2)
@@ -1804,7 +1626,6 @@ class DualArmEnv:
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
-        print("move_x: pos1 = ", pos1, "pos2 = ", pos2)
         pos1[0] += delta
         pos2[0] -= delta
         return self.move_ee(pos1, angle1, pos2, angle2)
@@ -1813,7 +1634,6 @@ class DualArmEnv:
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
-        print("move_y: pos1 = ", pos1, "pos2 = ", pos2)
         pos1[1] += delta
         pos2[1] -= delta
         return self.move_ee(pos1, angle1, pos2, angle2)
