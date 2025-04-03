@@ -548,7 +548,6 @@ class DualArmEnv:
 
 
         idx_list = [self.robot.get_dof_index(x) for x in self.j_names]
-        # idx_list = [self.robot.get_dof_index(x) for x in self.j_names_primary]
         self.robot.set_joint_positions(self.default_config, idx_list)
         self.robot.set_joint_velocities(np.zeros(len(idx_list)), idx_list)
         kin_state = self.single_motion_gen.kinematics.get_state(self.single_motion_gen.get_retract_config().view(1, -1))
@@ -558,9 +557,6 @@ class DualArmEnv:
             t_pos = np.ravel(v.to_list())
             self.default_ee_pos[k] = t_pos[:3]
             self.default_ee_pos[k][2] += 0.15 #TODO: Test this, added 0.15m to z
-        # t_pos = np.ravel(kin_state.ee_pose.to_list())
-        # self.default_ee_pos = t_pos[:3]
-        # self.default_ee_rot = t_pos[3:]
         sim_js = self.robot.get_joints_state()
         self.dof_names = self.robot.dof_names
         for pair in zip(self.dof_names, sim_js.positions):
@@ -695,10 +691,6 @@ class DualArmEnv:
         # safety pre_grasp
         goal_arm1[2] += self.pre_grasp_height
         goal_arm2[2] += self.pre_grasp_height
-        # if goal_arm1[2] >= self.default_ee_pos[self.arm1][2]+self.pre_grasp_height:
-        #     goal_arm1[2] -= self.pre_grasp_height
-        # if goal_arm2[2] >= self.default_ee_pos[self.arm2][2]+self.pre_grasp_height:
-        #     goal_arm2[2] -= self.pre_grasp_height
 
         task_execution_result = self.get_task_execution_result(task_plan)
 
@@ -944,6 +936,7 @@ class DualArmEnv:
                 self.sync_isaacsim_curobo()
 
             idx_to_sync = list(range(self.task.num_objects))
+            #TODO: Do I need to be concerned that the attaching and detaching happens after the gripper control in self.motion_plan()?
             if task_plan.arm1_gripper_action == GripperAction.CLOSE and task_plan.arm1_assigned_object != -1:
                 print(f"Attaching object {task_plan.arm1_assigned_object} to {self.arm1}")
                 self.attach_obj(cu_js=self.get_current_arm_js(), cube_name=self.objects_curobo[task_plan.arm1_assigned_object].name, arm_name=self.arm1)
@@ -970,12 +963,44 @@ class DualArmEnv:
         return self.recorded_plan
     
     def plan_all(self):
+        self.get_ready()
+        task_plans = []
         while not self.task.finished():
+            starts = self.task.get_starts().copy()
             task_plan = self.task_plan()
+            task_plans.append(task_plan)
             task_execution_result = self.get_task_execution_result(task_plan)
             # we need to assume the motion planning has succeeded and update the start to goal in the curobo world_cfg
-
+            if not task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
+                goal_arm1 = self.task.get_start( task_plan.arm1_assigned_object ).copy() if task_plan.arm1_to_start else self.task.get_goal( task_plan.arm1_assigned_object ).copy()
+                starts[task_plan.arm1_assigned_object] = goal_arm1
+            if not task_plan.arm2_assigned_object == -1 or task_plan.arm2_assigned_object is None:
+                goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ).copy() if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object ).copy()
+                starts[task_plan.arm2_assigned_object] = goal_arm2
+            
+            #TODO: Do I need the attach and the detach here?
+            idx_to_sync = list(range(self.task.num_objects))
+            new_starts = {}
+            cuboids = []
+            for i in idx_to_sync:
+                cube_curobo = self.objects_curobo[i]
+                cube_curobo.pose = [starts[i][0], starts[i][1], starts[i][2], 1, 0, 0, 0]
+                cuboids.append(cube_curobo)
+                new_starts[i] = np.array([starts[i][0], starts[i][1], starts[i][2]])
+            self.task.set_starts(new_starts)
+            world_cfg_table = WorldConfig.from_dict(
+                load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
+            )
+            world_cfg_table.cuboid[0].pose[2] -= 0.02
+            self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid)
+            obs = cuboids + world_cfg_table.cuboid
+            self.world_cfg_curobo = WorldConfig(cuboid=obs)
+            self.single_motion_gen.clear_world_cache()
+            self.single_motion_gen.update_world(self.world_cfg_curobo)
+            self.ik_solver.update_world(self.world_cfg_curobo)
+            print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
             self.task.update(task_execution_result)
+        return task_plans
 
     
     def check_object_collision_enabled(self):
@@ -1013,8 +1038,6 @@ class DualArmEnv:
             for si, s in enumerate(sph_list[0]):
                 self.spheres[si].set_world_pose(position=np.ravel(s.position))
                 self.spheres[si].set_radius(float(s.radius))
-
-
             
     def visualize_plan(self, plan: JointState):
         if plan is None:
@@ -1108,9 +1131,7 @@ class DualArmEnv:
                     return 
         
 
-    
     def find_available_task_with_buffers(self, task_plan: TaskPlan):
-        #TODO: make this buffer size configurable
         buffers = self.task.sample_buffers(self.num_buffers)
         for combo in self.preferred_angles_combination:
             for indices in task_plan.start_goal_pairs:
@@ -1196,7 +1217,6 @@ class DualArmEnv:
                     task_plan.arm1_angle = angle
                     return
         elif arm == self.arm2:
-            #TODO: fix this
             for angle in self.all_angles:
                 start1 = self.default_ee_pos[self.arm1]
                 goal1 = self.default_ee_pos[self.arm1]
@@ -1263,7 +1283,6 @@ class DualArmEnv:
         for arm, gripper_primary_name in self.gripper_primary_joints_dict.items():
             idx = self.common_js_names.index(gripper_primary_name)
             positions[idx] = gripper_primary_pos_dict[gripper_primary_name] + 0.002 * self.gripper_closed[arm]
-            # positions[idx] = gripper_primary_pos_dict[gripper_primary_name] 
         return positions
     
     def get_current_arm_js(self):
@@ -1379,7 +1398,6 @@ class DualArmEnv:
         rotations = []
         for i in range(self.task.num_objects):
             cube_isaac = self.objects_isaacsim_dynamic[i]
-            cube_curobo = self.objects_curobo[i]
             p, q = cube_isaac.get_world_pose()
             positions.append(p)
             rotations.append(q)
@@ -1404,7 +1422,6 @@ class DualArmEnv:
         world_cfg_table.cuboid[0].pose[2] -= 0.02
         self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid)
         obs = cuboids + world_cfg_table.cuboid
-        # self.world_cfg_curobo = WorldConfig(cuboid=obs, mesh=world_cfg1.mesh)
         self.world_cfg_curobo = WorldConfig(cuboid=obs)
         self.single_motion_gen.clear_world_cache()
         self.single_motion_gen.update_world(self.world_cfg_curobo)
@@ -1418,7 +1435,6 @@ class DualArmEnv:
             run_marching_cubes=True
         )
         mesh.save_as_mesh(file_path="results/scene.obj")
-
 
     def display(self, reset=False):
         if reset:
@@ -1565,13 +1581,19 @@ class DualArmEnv:
 
 # debug
 if __name__ == '__main__':
-    num_objects:int = 4  
-    map_width:float = 0.6 
-    map_length:float = 0.6 
-    object_size:float = 0.05 
-    task = Task(num_objects, map_width, map_length, object_size)
-    # task.generate()
-    task.generate_fixed_two_objects(offset=0.)
+    test_grasp_angles = False
+    test_plan_all = True
+    if test_grasp_angles:
+        num_objects:int = 4  
+        map_width:float = 0.6 
+        map_length:float = 0.6 
+        object_size:float = 0.05 
+
+        task = Task(num_objects, map_width, map_length, object_size)
+        # task.generate()
+        task.generate_fixed_two_objects(offset=0.)
+    if test_plan_all:
+        task = Task.read_from_json("data/task_2_cycle.json")
     # task.generate_chained_two_objects()
     # task.generate_fixed_cycled_objects()
     # task.generate_fixed_two_objects_to_test_grasp_orientation()
@@ -1590,7 +1612,11 @@ if __name__ == '__main__':
     # dual_arm.test_ik_solve_batch()
     # dual_arm.test_plan_batch()
     # dual_arm.display()
-    dual_arm.test_different_grasp_angles()
+    if test_grasp_angles:
+        dual_arm.test_different_grasp_angles()
+    if test_plan_all:
+        task_plans = dual_arm.plan_all()
+        print(task_plans)
     # dual_arm.test_gripper_control()
     # dual_arm.test_grasp()
     # dual_arm.test_move_ee()
