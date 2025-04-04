@@ -32,7 +32,7 @@
                 "data/task_2_cycle.json",
                 // "data/task_cycled_4_objects_0.json",
                 "--method",
-                "ours"
+                "baseline"
             ]
         },
         {

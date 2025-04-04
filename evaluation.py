@@ -58,8 +58,8 @@ if __name__ == "__main__":
     
     if args.method == "baseline":
         baseline = Baseline(task, simulation_app)
-        plan = baseline.plan(autostart=True)
-        # baseline.play(plan)
+        plan = baseline.plan(autostart=True, use_our_planner=True)
+        baseline.play(plan)
     else:
         # Call our method
         dual_arm_env = DualArmEnv(task, simulation_app, batch_size=3, constrain_grasp_approach=False, visualize_spheres=False)

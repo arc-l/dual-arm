@@ -41,9 +41,30 @@ class Baseline(DualArmEnv):
             start_arr[i] = starts[i]
             goal_arr[i] = goals[i]
         return start_arr, goal_arr
+    
+    def plan_all(self):
+        task_plans = super().plan_all()
+        start_arr, goal_arr = self.prepare_input()
+        action_list = {0:[], 1:[]}
+        for plan in task_plans:
+            if plan.arm1_assigned_object != -1:
+                action_list[0].append((
+                    plan.arm1_assigned_object,
+                    start_arr[plan.arm1_assigned_object],
+                    goal_arr[plan.arm1_assigned_object],
+                ))
+            if plan.arm2_assigned_object != -1:
+                action_list[1].append((
+                    plan.arm2_assigned_object,
+                    start_arr[plan.arm2_assigned_object],
+                    goal_arr[plan.arm2_assigned_object],
+                ))
+            
+        return action_list
 
 
-    def plan(self, autostart=False):
+
+    def plan(self, autostart=False, use_our_planner=False):
         self.get_ready(autostart=autostart)
         start_arr, goal_arr = self.prepare_input()
         print("start_arr", start_arr)
@@ -51,22 +72,26 @@ class Baseline(DualArmEnv):
         Height = 1000
         Width = 1000
         control_mode = ControlMode.POSITION
-        size = 37.5 # 0.0225 / 0.6 * 1000
+        # size = 37.5 # 0.0225 / 0.6 * 1000
+        size = 41.7 # 0.025 / 0.6 * 1000
         time_step_size = 0.02
         speed = 0.3141592653589793 * 5
         method = 'baseline_v2'
-        planner = Bi_Directional_Search_Tree_Planner(
-            start_arr, 
-            goal_arr, 
-            Height, 
-            Width, 
-            size, 
-            sampling=True, 
-            overlap_rate=1.0, 
-            num_arms=2,
-            makespan='MC'
-        )
-        action_list = planner.action_list
+        if use_our_planner:
+            action_list = self.plan_all()
+        else:
+            planner = Bi_Directional_Search_Tree_Planner(
+                start_arr, 
+                goal_arr, 
+                Height, 
+                Width, 
+                size, 
+                sampling=True, 
+                overlap_rate=1.0, 
+                num_arms=2,
+                makespan='MC'
+            )
+            action_list = planner.action_list
         action_list = plan2schedule(action_list)
         result_dict, control = simulation(
             Width, Height,start_arr, goal_arr, size, action_list, 
