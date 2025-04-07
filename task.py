@@ -88,6 +88,7 @@ class Task:
         self.object_size = object_size
         self.starts = None
         self.goals = None
+        self.original_starts = None
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         # self.generate()
         self.start_dict = None
@@ -110,6 +111,7 @@ class Task:
             np.array([-offset, -self.map_length/2 + 2 * self.object_size, self.object_size/2]), 
             np.array([offset, self.map_length/2 - 2 * self.object_size, self.object_size/2])
             ]
+        self.original_starts = self.starts.copy()
         self.goals = [
             np.array([-offset, self.map_length/2 - 2 * self.object_size, self.object_size/2]),
             np.array([offset, -self.map_length/2 + 2 * self.object_size, self.object_size/2]), 
@@ -125,6 +127,7 @@ class Task:
             np.array([-self.map_length/2 + 2 * self.object_size, 0, self.object_size/2]), 
             np.array([self.map_length/2 - 2 * self.object_size, 0, self.object_size/2])
             ]
+        self.original_starts = self.starts.copy()
         self.goals = [
             np.array([self.map_length/2 - 2 * self.object_size, 0, self.object_size/2]),
             np.array([-self.map_length/2 + 2 * self.object_size, 0, self.object_size/2]), 
@@ -149,6 +152,7 @@ class Task:
             np.array([-self.map_width/2 + 2 * self.object_size, -self.map_width/2 + 2 * self.object_size, self.object_size/2]), 
             np.array([self.map_width/2 - 2 * self.object_size, -self.map_width/2 + 2 * self.object_size, self.object_size/2])
         ]
+        self.original_starts = self.starts.copy()
         self.goals = [
             np.array([self.map_width/2 - 2 * self.object_size, -self.map_width/2 + 2 * self.object_size, self.object_size/2]),
             np.array([self.map_width/2 - 2 * self.object_size, self.map_width/2 - 2 * self.object_size, self.object_size/2]),
@@ -174,6 +178,7 @@ class Task:
         # ]
 
         self.starts, self.goals = self.goals, self.starts
+        self.original_starts = self.starts.copy()
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
 
@@ -190,6 +195,7 @@ class Task:
         ]
 
         self.starts, self.goals = self.goals, self.starts
+        self.original_starts = self.starts.copy()
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
     
@@ -204,6 +210,7 @@ class Task:
         for i in range(self.num_objects):
             goal = self.starts[(i+1)%self.num_objects]
             self.goals.append(goal)
+        self.original_starts = self.starts.copy()
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
     
@@ -222,6 +229,7 @@ class Task:
             self.goals.append(goal)
         
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
+        self.original_starts = self.starts.copy()
         self.init()
     
     
@@ -239,6 +247,7 @@ class Task:
             self.goals.append(self.starts[(i+1)%len(self.starts)])
         
         self.goals[-1] = np.array([0, 0, self.object_size/2])
+        self.original_starts = self.starts.copy()
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
         
@@ -258,6 +267,7 @@ class Task:
         for i in range(len(self.starts)):
             goal = (self.starts[i] + self.starts[(i+1)%len(self.starts)])/2
             self.goals.append(goal)
+        self.original_starts = self.starts.copy()
         
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
@@ -300,6 +310,7 @@ class Task:
                     cnt += 1
                 self.goals.append(goal)
 
+        self.original_starts = self.starts.copy()
         self.init()
 
     def check_collision_between_cubes(self, pos1: np.ndarray, pos2: np.ndarray, clearance=0)->bool:
@@ -422,6 +433,9 @@ class Task:
     
     def get_starts(self):
         return self.starts
+    
+    def get_original_starts(self):
+        return self.original_starts
     
     def get_goals(self):
         return self.goals
@@ -746,6 +760,7 @@ class Task:
         task = Task(len(data['starts']), data['map_width'], data['map_length'], data['object_size'])
         task.starts = [np.array(start) for start in data['starts']]
         task.goals = [np.array(goal) for goal in data['goals']]
+        task.original_starts = task.starts.copy()
         task.init()
         return task
     

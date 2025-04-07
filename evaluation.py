@@ -58,7 +58,7 @@ if __name__ == "__main__":
     
     if args.method == "baseline":
         baseline = Baseline(task, simulation_app)
-        plan = baseline.plan(autostart=False, use_our_planner=False)
+        plan = baseline.plan(autostart=False, use_our_planner=True)
         baseline.play(plan)
     else:
         # Call our method

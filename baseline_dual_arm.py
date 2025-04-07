@@ -27,19 +27,21 @@ from task import Task, GripperAction
 class Baseline(DualArmEnv):
     def __init__(self, task: Task, simulation_app: SimulationApp):
         super().__init__(task, simulation_app, batch_size = 3, constrain_grasp_approach=False, visualize_spheres=False)
+    
+    @staticmethod
+    def convert_to_task_planner_space(pos):
+        pos = 1000 * pos/0.6 + 500
+        pos = pos.tolist()[:2]
+        return pos
 
     def prepare_input(self):
-        starts = self.task.get_starts().copy()
+        starts = self.task.get_original_starts().copy()
         goals = self.task.get_goals().copy()
         start_arr = {}
         goal_arr = {}
         for i in range(len(starts)):
-            starts[i] = 1000 * starts[i]/0.6 + 500
-            goals[i] = 1000 * goals[i]/0.6 + 500
-            starts[i] = starts[i].tolist()[:2]
-            goals[i] = goals[i].tolist()[:2]
-            start_arr[i] = starts[i]
-            goal_arr[i] = goals[i]
+            start_arr[i] = self.convert_to_task_planner_space(starts[i])
+            goal_arr[i] = self.convert_to_task_planner_space(goals[i])
         return start_arr, goal_arr
     
     def plan_all(self):
@@ -47,19 +49,35 @@ class Baseline(DualArmEnv):
         start_arr, goal_arr = self.prepare_input()
         action_list = {0:[], 1:[]}
         for plan in task_plans:
+            if plan.arm1_gripper_action==GripperAction.OPEN:
+                continue
             if plan.arm1_assigned_object != -1:
+                start = start_arr[plan.arm1_assigned_object]
+                goal = goal_arr[plan.arm1_assigned_object] 
+                if plan.buffer is not None and plan.buffer[1] is not None:
+                    goal = self.convert_to_task_planner_space(plan.buffer[1])
+                    start_arr[plan.arm1_assigned_object] = self.convert_to_task_planner_space(plan.buffer[1])
                 action_list[0].append((
                     plan.arm1_assigned_object,
-                    start_arr[plan.arm1_assigned_object],
-                    goal_arr[plan.arm1_assigned_object],
+                    start,
+                    goal,
                 ))
+            else:
+                action_list[0].append(None)
             if plan.arm2_assigned_object != -1:
+                start = start_arr[plan.arm2_assigned_object]
+                goal = goal_arr[plan.arm2_assigned_object] 
+                if plan.buffer is not None and plan.buffer[2] is not None:
+                    goal = self.convert_to_task_planner_space(plan.buffer[2])
+                    start_arr[plan.arm2_assigned_object] = self.convert_to_task_planner_space(plan.buffer[2])
                 action_list[1].append((
                     plan.arm2_assigned_object,
-                    start_arr[plan.arm2_assigned_object],
-                    goal_arr[plan.arm2_assigned_object],
+                    start,
+                    goal
                 ))
-            
+            else:
+                action_list[1].append(None)
+
         return action_list
 
 
