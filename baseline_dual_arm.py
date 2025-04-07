@@ -73,7 +73,7 @@ class Baseline(DualArmEnv):
         Width = 1000
         control_mode = ControlMode.POSITION
         # size = 37.5 # 0.0225 / 0.6 * 1000
-        size = 41.7 # 0.025 / 0.6 * 1000
+        size = 41.7 * np.sqrt(2) # 0.025 / 0.6 * 1000 * np.sqrt(2)
         time_step_size = 0.02
         speed = 0.3141592653589793 * 5
         method = 'baseline_v2'
