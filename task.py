@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import random
+from copy import deepcopy
 from itertools import permutations
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -111,7 +112,7 @@ class Task:
             np.array([-offset, -self.map_length/2 + 2 * self.object_size, self.object_size/2]), 
             np.array([offset, self.map_length/2 - 2 * self.object_size, self.object_size/2])
             ]
-        self.original_starts = self.starts.copy()
+        self.original_starts = deepcopy(self.starts)
         self.goals = [
             np.array([-offset, self.map_length/2 - 2 * self.object_size, self.object_size/2]),
             np.array([offset, -self.map_length/2 + 2 * self.object_size, self.object_size/2]), 
@@ -127,7 +128,7 @@ class Task:
             np.array([-self.map_length/2 + 2 * self.object_size, 0, self.object_size/2]), 
             np.array([self.map_length/2 - 2 * self.object_size, 0, self.object_size/2])
             ]
-        self.original_starts = self.starts.copy()
+        self.original_starts = deepcopy(self.starts)
         self.goals = [
             np.array([self.map_length/2 - 2 * self.object_size, 0, self.object_size/2]),
             np.array([-self.map_length/2 + 2 * self.object_size, 0, self.object_size/2]), 
@@ -152,7 +153,7 @@ class Task:
             np.array([-self.map_width/2 + 2 * self.object_size, -self.map_width/2 + 2 * self.object_size, self.object_size/2]), 
             np.array([self.map_width/2 - 2 * self.object_size, -self.map_width/2 + 2 * self.object_size, self.object_size/2])
         ]
-        self.original_starts = self.starts.copy()
+        self.original_starts = deepcopy(self.starts)
         self.goals = [
             np.array([self.map_width/2 - 2 * self.object_size, -self.map_width/2 + 2 * self.object_size, self.object_size/2]),
             np.array([self.map_width/2 - 2 * self.object_size, self.map_width/2 - 2 * self.object_size, self.object_size/2]),
@@ -178,7 +179,7 @@ class Task:
         # ]
 
         self.starts, self.goals = self.goals, self.starts
-        self.original_starts = self.starts.copy()
+        self.original_starts = deepcopy(self.starts)
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
 
@@ -195,7 +196,7 @@ class Task:
         ]
 
         self.starts, self.goals = self.goals, self.starts
-        self.original_starts = self.starts.copy()
+        self.original_starts = deepcopy(self.starts)
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
     
@@ -210,7 +211,7 @@ class Task:
         for i in range(self.num_objects):
             goal = self.starts[(i+1)%self.num_objects]
             self.goals.append(goal)
-        self.original_starts = self.starts.copy()
+        self.original_starts = deepcopy(self.starts)
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
     
@@ -229,7 +230,7 @@ class Task:
             self.goals.append(goal)
         
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
-        self.original_starts = self.starts.copy()
+        self.original_starts = deepcopy(self.starts)
         self.init()
     
     
@@ -247,7 +248,7 @@ class Task:
             self.goals.append(self.starts[(i+1)%len(self.starts)])
         
         self.goals[-1] = np.array([0, 0, self.object_size/2])
-        self.original_starts = self.starts.copy()
+        self.original_starts = deepcopy(self.starts)
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
         
@@ -267,11 +268,60 @@ class Task:
         for i in range(len(self.starts)):
             goal = (self.starts[i] + self.starts[(i+1)%len(self.starts)])/2
             self.goals.append(goal)
-        self.original_starts = self.starts.copy()
+        self.original_starts = deepcopy(self.starts)
         
         self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
         self.init()
         
+    def generate_running_example(self)->None:
+        # one cycle, one chain, some independent objects
+        cycle_starts = [
+            np.array([-self.map_width/2 + 2 * self.object_size, -self.map_length/2 + 2 * self.object_size, self.object_size/2]), 
+            np.array([self.map_width/2 - 2 * self.object_size, -self.map_length/2 + 2 * self.object_size, self.object_size/2]),
+            np.array([self.map_width/2 - 2 * self.object_size, self.map_length/2 - 2 * self.object_size, self.object_size/2]),
+            np.array([-self.map_width/2 + 2 * self.object_size, self.map_length/2 - 2 * self.object_size, self.object_size/2]), # cycles object
+        ]
+        for i in range(len(cycle_starts)):
+            cycle_starts[i][:-1] += (np.random.rand(2)-0.5) * 0.2
+            cycle_starts[i] = np.clip(cycle_starts[i], -self.map_width/2 + self.object_size, self.map_width/2 - self.object_size)
+        # cycle_starts = []
+        # cnt = 0
+        # for i in range(4):
+        #     start = self.random_position()
+        #     while self.check_collision(cycle_starts, start, 0.1):
+        #         start = self.random_position()
+        #         if cnt > 1000:
+        #             raise RuntimeError('Cannot generate task configuration')
+        #         cnt += 1
+        #     cycle_starts.append(start)
+        cycle_goals = cycle_starts[1:] + [cycle_starts[0]]
+        chain_starts = []
+        for i in range(len(cycle_starts)-1):
+            goal = (cycle_starts[i] + cycle_starts[(i+1)%len(cycle_starts)])/2
+            chain_starts.append(goal)
+        chain_goals = [np.array([0,0, self.object_size/2])] + chain_starts[0:-1]
+
+        independent_starts = []
+        for i in range(len(chain_starts)-1):
+            independent_start = (chain_starts[i] + chain_starts[(i+1)%len(chain_starts)])/2
+            independent_starts.append(independent_start)
+
+        independent_goals = [np.array([-1 * start[0], start[1], start[2]]) for start in independent_starts] 
+        independent_starts, independent_goals = independent_goals, independent_starts
+
+        self.starts = deepcopy(cycle_starts) + deepcopy(chain_starts) + deepcopy(independent_starts)
+        self.goals = deepcopy(cycle_goals) + deepcopy(chain_goals) + deepcopy(independent_goals)
+        self.starts[8][0] = self.starts[3][0]
+        self.starts[8][1] = self.starts[3][1] - self.object_size / 3. * 2
+        self.starts[3][1] += self.object_size / 3. * 2 
+
+        
+        self.num_objects = len(self.starts)
+        self.buffer_dict = {i: None for i in range(self.num_objects)}
+        self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
+        self.original_starts = deepcopy(self.starts)
+        self.init()
+
     
     def random_position(self):
         x, y = 2 * (np.random.rand(2)-0.5) * np.array([self.map_width/2 - self.object_size, self.map_length/2 - self.object_size])
@@ -763,64 +813,137 @@ class Task:
         task.original_starts = task.starts.copy()
         task.init()
         return task
-    
-    def draw_dependency_graph(self, save_path: str):
-        """
-        Visualizes the dependency graph using the start positions.
-        
-        - Draws a rectangle for each object using its start position (centered).
-        - Annotates each rectangle with the object id.
-        - Draws arrows from interfering objects to the dependent object, using the start positions.
-        
-        The resulting image is saved to save_path.
-        """
 
-        # Create a figure and axis.
+    def draw_dependency_graph(task, save_path: str):
+        """
+        Draws the dependency graph using edge-to-edge arrows with enhanced styling.
+        Arrows start and end at the rectangle edges closest to each other.
+        """
         fig, ax = plt.subplots(figsize=(8, 8))
-        ax.set_xlim([-self.map_width / 2, self.map_width / 2])
-        ax.set_ylim([-self.map_length / 2, self.map_length / 2])
+        # Draw the table surface as a light gray square background
+        table_rect = patches.FancyBboxPatch(
+            (-task.map_width / 2, -task.map_length / 2),
+            task.map_width,
+            task.map_length,
+            boxstyle="round,pad=0.02",  # Rounded corners; change to "square" if preferred
+            edgecolor='black',
+            facecolor='lightgray',  # Light gray table color
+            linewidth=2,
+            # zorder=0  # Behind everything else
+        )
+        ax.add_patch(table_rect)
+        ax.set_xlim([-task.map_width / 2, task.map_width / 2])
+        ax.set_ylim([-task.map_length / 2, task.map_length / 2])
         ax.set_aspect('equal')
-        ax.set_title("Dependency Graph (Using Start Positions)")
+        ax.set_title("Dependency Graph (Edge-to-Edge Arrows)")
 
-        # Draw patches for each object using the start positions.
-        # We assume self.start_dict contains keys = object id and value = start coordinate (as np.array)
-        for obj_id, start in self.start_dict.items():
-            cx, cy = start[0], start[1]
-            # Convert center to lower-left corner for the Rectangle patch
-            lower_left = (cx - self.object_size / 2, cy - self.object_size / 2)
-            color = self.colors[obj_id]
-            rect = patches.Rectangle(lower_left, self.object_size, self.object_size,
+        object_size = task.object_size * 1.2
+
+        def get_edge_center(from_pt, to_pt):
+            """Return the edge center (on the square at from_pt) that's closest to to_pt."""
+            dx, dy = to_pt[0] - from_pt[0], to_pt[1] - from_pt[1]
+            if abs(dx) > abs(dy):
+                return (from_pt[0] + np.sign(dx) * object_size / 2, from_pt[1])
+            else:
+                return (from_pt[0], from_pt[1] + np.sign(dy) * object_size / 2)
+
+        # Draw objects and label them
+        for obj_id, start in task.start_dict.items():
+            lower_left = (start[0] - object_size / 2, start[1] - object_size / 2)
+            color = task.colors[obj_id]
+            rect = patches.Rectangle(lower_left, object_size, object_size,
                                     facecolor=color, edgecolor='black', alpha=1.0)
             ax.add_patch(rect)
-            # Annotate the center of the rectangle with the object id.
-            ax.text(cx, cy, str(obj_id), color='black', fontsize=12,
+            ax.text(start[0], start[1], str(obj_id), color='black', fontsize=40,
                     ha='center', va='center')
 
-        # Draw dependency arrows.
-        # The dependency graph is stored in self.dependency_graph.dependency_graph.
-        # For each dependent object, draw an arrow from each interfering object's start to the dependent's start.
-        dep_graph = self.dependency_graph.dependency_graph
-        for dependent, interfering_set in dep_graph.items():
-            # Check that the dependent object exists in start_dict
-            if dependent not in self.start_dict:
-                continue
-            dest = self.start_dict[dependent]
-            dest_center = (dest[0], dest[1])
+        # Draw dependency arrows
+        for dependent, interfering_set in task.dependency_graph.dependency_graph.items():
+            dest = task.start_dict[dependent]
             for interfering in interfering_set:
-                if interfering not in self.start_dict:
-                    continue
-                source = self.start_dict[interfering]
-                source_center = (source[0], source[1])
-                # Draw an arrow from the interfering object (source) to the dependent object (destination)
+                source = task.start_dict[interfering]
+                src_edge = get_edge_center(source, dest)
+                dst_edge = get_edge_center(dest, source)
+
                 ax.annotate("",
-                            xy=dest_center, xycoords='data',
-                            xytext=source_center, textcoords='data',
-                            arrowprops=dict(arrowstyle="->", color='black', lw=1.5))
+                            xy=dst_edge, xycoords='data',
+                            xytext=src_edge, textcoords='data',
+                            arrowprops=dict(
+                                arrowstyle="->",
+                                color='black',
+                                lw=1.5,
+                                mutation_scale=40,
+                                connectionstyle="arc3,rad=0.3"  # Your curve
+                            ))
+                ax.set_xticks([])
+                ax.set_yticks([])
 
         plt.tight_layout()
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"Saved dependency graph visualization to: {save_path}")
+        print(f"Saved edge-to-edge dependency graph to: {save_path}")
         plt.close(fig)
+
+    
+    def draw_start_goal_pair(task, save_path=None):
+        """
+        Draws two subplots: one showing the start positions and one showing the goal positions.
+        Each object is labeled with its ID.
+        """
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+        titles = ['Start Positions', 'Goal Positions']
+        goal_scale = 1.2
+        scaled_size = task.object_size * goal_scale
+
+        for ax, title, is_goal in zip(axes, titles, [False, True]):
+            # Draw the table surface as a light gray square background
+            table_rect = patches.FancyBboxPatch(
+                (-task.map_width / 2, -task.map_length / 2),
+                task.map_width,
+                task.map_length,
+                boxstyle="round,pad=0.02",  # Rounded corners; change to "square" if preferred
+                edgecolor='black',
+                facecolor='lightgray',  # Light gray table color
+                linewidth=2,
+                # zorder=0  # Behind everything else
+            )
+            ax.add_patch(table_rect)
+            ax.set_xlim([-task.map_width / 2, task.map_width / 2])
+            ax.set_ylim([-task.map_length / 2, task.map_length / 2])
+            ax.set_aspect('equal')
+            ax.set_title(title)
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+            for i in range(task.num_objects):
+                color = task.colors[i]
+                pos = task.get_goal(i) if is_goal else task.get_start(i)
+                # size = scaled_size if is_goal else task.object_size
+                size = scaled_size 
+                lower_left = (pos[0] - size / 2, pos[1] - size / 2)
+                hatch = '/' if is_goal else None
+                alpha = 1.0
+
+                ax.add_patch(plt.Rectangle(
+                    lower_left,
+                    size,
+                    size,
+                    facecolor=color,
+                    edgecolor='black',
+                    hatch=hatch,
+                    alpha=alpha
+                ))
+
+                ax.text(pos[0], pos[1], str(i), color='black', fontsize=30,
+                        ha='center', va='center')
+
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Saved to {save_path}")
+            plt.close(fig)
+        else:
+            plt.show()
+
 
 
 
@@ -870,7 +993,9 @@ if __name__ == '__main__':
     # # Generate dataset
     # generate_dataset(20.1, 'data')
 
-
-    task = Task.read_from_json('data/task_2_cycle.json')
-    task.draw_triptych('result.png')
-    task.draw_dependency_graph('dependency_graph.png')
+    task = Task(10, 0.6, 0.6, 0.05) 
+    task.generate_running_example()
+    task.draw_triptych("results/running_example.png")
+    task.draw_dependency_graph("results/dependency_graph.png")
+    task.draw_start_goal_pair("results/start_goal_pair.png")
+    task.write_to_json("data/task_running_example.json")
