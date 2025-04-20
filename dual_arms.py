@@ -620,7 +620,7 @@ class DualArmEnv:
         print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
     
     def add_objects_isaacsim(self):
-        starts = self.task.get_starts()
+        starts = self.task.get_original_starts()
         goals = self.task.get_goals()
         colors = self.task.get_colors()
         if len(self.objects_isaacsim_dynamic)>0:

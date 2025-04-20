@@ -115,7 +115,7 @@ class Baseline(DualArmEnv):
             Width, Height,start_arr, goal_arr, size, action_list, 
             overlap_rate = 1.0, speed=speed, 
             time_step_size=time_step_size, control_mode=control_mode, 
-            gui=True, method=method, debug = False)
+            gui=True, method=method, debug = True)
         
         recorded_plan = result_dict['recorded_plan']
         recorded_plan = self.post_process(recorded_plan)
