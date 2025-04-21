@@ -1,6 +1,8 @@
 import isaacsim
 from omni.isaac.kit import SimulationApp
 if __name__ == '__main__':
+    import helper
+    helper.HEADLESS = False 
     simulation_app = SimulationApp({
                     "headless": False,
                     "width": "1920",
@@ -61,7 +63,11 @@ if __name__ == "__main__":
     else:
         # Call our method
         planner = DualArmEnv(task, simulation_app, batch_size=3, constrain_grasp_approach=False, visualize_spheres=False)
+    
+    # change the input json file's extension to .pkl
+    # and change it to results folder from data folder
+    plan_path = args.input.replace('.json', f'_{args.method}_plan.pkl').replace('data', 'results')
 
-    plan = load_plan("results/task_random_4_objects_0_ours_plan.pkl", device='cuda:0')
+    plan = load_plan(plan_path, device='cuda:0')
     planner.play(plan)
 

@@ -1,19 +1,37 @@
 import isaacsim
 from omni.isaac.kit import SimulationApp
+from helper import save_plan, load_plan, HEADLESS
+import helper
 if __name__ == '__main__':
-    simulation_app = SimulationApp({
-                    "headless": False,
-                    "width": "1920",
-                    "height": "1080",
-    })
+    if helper.HEADLESS:
+        simulation_app = None
+    else:
+        simulation_app = SimulationApp({
+                        "headless": False,
+                        "width": "1920",
+                        "height": "1080",
+        })
+
+if not helper.HEADLESS:
+    from pxr import Usd, UsdPhysics, Sdf, UsdGeom, PhysxSchema, Gf, UsdShade
+    from curobo_isaacsim_helper import add_extensions, add_robot_to_scene
+    # from isaacsim.core.api.world import World
+    # from isaacsim.core.api.objects import cuboid, sphere, DynamicCuboid
+    # from isaacsim.core.api.materials.physics_material import PhysicsMaterial 
+    # import isaacsim.core.utils.prims as prims_utils
+    from omni.isaac.core import World
+    from omni.isaac.core.objects import cuboid, sphere, DynamicCuboid
+    from omni.isaac.core.materials import PhysicsMaterial
+    import omni.isaac.core.utils.prims as prims_utils
+    ########### OV #################
+    # from isaacsim.core.utils.types import ArticulationAction
+    from omni.isaac.core.utils.types import ArticulationAction
+    from curobo.util.usd_helper import UsdHelper
 
 from dual_arms import DualArmEnv
 from baseline_dual_arm import Baseline
 import argparse, json, os, pickle
-import torch
-import curobo
 from curobo.types.state import JointState
-from helper import save_plan, load_plan
 from task import Task
 
 def parse_arguments():

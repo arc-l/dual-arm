@@ -30,8 +30,8 @@
             "args": [
                 "--input",
                 // "data/task_2_cycle.json",
-                // "data/task_cycled_4_objects_0.json",
-                "data/task_running_example.json",
+                "data/task_cycled_4_objects_0.json",
+                // "data/task_running_example.json",
                 // "data/task_fixed_cycled_4_objects.json",
                 "--method",
                 "ours"

@@ -10,28 +10,32 @@ import time
 import isaacsim
 from typing import List
 from omni.isaac.kit import SimulationApp
-# from isaacsim import SimulationApp
+import helper
 if __name__ == '__main__':
-    simulation_app = SimulationApp({
-                    "headless": False,
-                    "width": "1920",
-                    "height": "1080",
-    })
+    if helper.HEADLESS:
+        simulation_app = None
+    else:
+        simulation_app = SimulationApp({
+                        "headless": False,
+                        "width": "1920",
+                        "height": "1080",
+        })
 
-import carb
-from helper import add_extensions, add_robot_to_scene
-# from isaacsim.core.api.world import World
-# from isaacsim.core.api.objects import cuboid, sphere, DynamicCuboid
-# from isaacsim.core.api.materials.physics_material import PhysicsMaterial 
-# import isaacsim.core.utils.prims as prims_utils
-from omni.isaac.core import World
-from omni.isaac.core.objects import cuboid, sphere, DynamicCuboid
-from omni.isaac.core.materials import PhysicsMaterial
-import omni.isaac.core.utils.prims as prims_utils
-
-########### OV #################
-# from isaacsim.core.utils.types import ArticulationAction
-from omni.isaac.core.utils.types import ArticulationAction
+if not helper.HEADLESS:
+    from pxr import Usd, UsdPhysics, Sdf, UsdGeom, PhysxSchema, Gf, UsdShade
+    from curobo_isaacsim_helper import add_extensions, add_robot_to_scene
+    # from isaacsim.core.api.world import World
+    # from isaacsim.core.api.objects import cuboid, sphere, DynamicCuboid
+    # from isaacsim.core.api.materials.physics_material import PhysicsMaterial 
+    # import isaacsim.core.utils.prims as prims_utils
+    from omni.isaac.core import World
+    from omni.isaac.core.objects import cuboid, sphere, DynamicCuboid
+    from omni.isaac.core.materials import PhysicsMaterial
+    import omni.isaac.core.utils.prims as prims_utils
+    ########### OV #################
+    # from isaacsim.core.utils.types import ArticulationAction
+    from omni.isaac.core.utils.types import ArticulationAction
+    from curobo.util.usd_helper import UsdHelper
 
 import torch
 def is_cuda_graph_reset_available():
@@ -57,12 +61,10 @@ from curobo.types.math import Pose
 from curobo.types.robot import JointState, RobotConfig
 from curobo.types.state import JointState
 from curobo.util.logger import setup_curobo_logger
-from curobo.util.usd_helper import UsdHelper
 from curobo.util_file import get_robot_configs_path, get_world_configs_path, join_path, load_yaml
 from curobo.wrap.reacher.motion_gen import MotionGen, MotionGenConfig, MotionGenPlanConfig, MotionGenResult, PoseCostMetric
 from curobo.wrap.reacher.ik_solver import IKSolver, IKSolverConfig
 
-from pxr import Usd, UsdPhysics, Sdf, UsdGeom, PhysxSchema, Gf, UsdShade
 
 # toppra
 import toppra as ta
@@ -71,31 +73,36 @@ import toppra.algorithm as algo
 
 # DualArmTAMP
 from task import Task, TaskPlan, TaskState, GripperState, TaskExecutionResult, ArmState, GripperAction
-from dependency_graph import DependencyGraph
 
 
 class DualArmEnv:
     def __init__(self, 
                  task: Task,
-                 simulation_app: SimulationApp,
+                 simulation_app: SimulationApp|None,
                  batch_size: int = 3,
                  constrain_grasp_approach: bool = False,
                  visualize_spheres: bool = False,
                  num_buffers: int = 20,
                  ):
         self.simulation_app = simulation_app
+        if simulation_app is None:
+            self.headless = True
+        else:
+            self.headless = False
         self.task = task
         self.spheres = None
         self.visualize_spheres = visualize_spheres
         self.num_buffers = num_buffers
         self.spheres = None
-        self.world = World(stage_units_in_meters=1.0)
-        self.stage = self.world.stage
-        xform = self.stage.DefinePrim("/World", "Xform")
-        self.stage.SetDefaultPrim(xform)
-        self.stage.DefinePrim("/curobo", "Xform")
+
+        if not self.headless:
+            self.world = World(stage_units_in_meters=1.0)
+            self.stage = self.world.stage
+            xform = self.stage.DefinePrim("/World", "Xform")
+            self.stage.SetDefaultPrim(xform)
+            self.stage.DefinePrim("/curobo", "Xform")
+            self.usd_help = UsdHelper()
         setup_curobo_logger("warn")
-        self.usd_help = UsdHelper()
         self.tensor_args = TensorDeviceType()
         self.robot_cfg = load_yaml(join_path(get_robot_configs_path(), "dual_ur5e_gripper.yml"))["robot_cfg"]
         gripper_cfg = load_yaml(join_path(get_robot_configs_path(), "gripper/dual_ur5e_gripper.yml"))["gripper_cfg"]
@@ -119,12 +126,14 @@ class DualArmEnv:
         self.j_names_primary = [name for name in self.j_names if name not in self.gripper_mimic_joint_names]
         print("j_names_primary = ", self.j_names_primary)
         self.default_config = self.robot_cfg["kinematics"]["cspace"]["retract_config"]
-        self.robot, self.robot_prim_path = add_robot_to_scene(self.robot_cfg, self.world)
-        self.set_material_for_finger_pads()
-        self.dof_names = []
+        if not self.headless:
+            self.robot, self.robot_prim_path = add_robot_to_scene(self.robot_cfg, self.world)
+            self.set_material_for_finger_pads()
+            self.dof_names = []
+            # Check screen boundaries
+            self.articulation_controller = self.robot.get_articulation_controller()
+            add_extensions(self.simulation_app, None)
 
-        # Check screen boundaries
-        self.articulation_controller = self.robot.get_articulation_controller()
         self.objects_curobo = []
         self.objects_isaacsim_dynamic = []
         self.objects_isaacsim_visual = []
@@ -132,12 +141,6 @@ class DualArmEnv:
             load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
         )
         world_cfg_table.cuboid[0].pose[2] -= 0.02
-        # world_cfg1 = WorldConfig.from_dict(
-        #     load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
-        # ).get_mesh_world()
-        # world_cfg1.mesh[0].name += "_mesh"
-        # world_cfg1.mesh[0].pose[2] = -10.5
-        # self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid, mesh=world_cfg1.mesh)
         self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid)
         self.add_objects_curobo()
         obs = self.objects_curobo + world_cfg_table.cuboid
@@ -206,7 +209,6 @@ class DualArmEnv:
         self.grid_num = batch_size
 
         print("Curobo is Ready")
-        add_extensions(self.simulation_app, None)
         
         pose_metric = None
         if constrain_grasp_approach:
@@ -233,9 +235,10 @@ class DualArmEnv:
             # fail_on_invalid_query=False,
         )
 
-        self.usd_help.load_stage(self.stage)
-        self.usd_help.add_world_to_stage(self.world_cfg, base_frame="/World", enable_physics=False)
-        self.world.scene.add_default_ground_plane()
+        if not self.headless:
+            self.usd_help.load_stage(self.stage)
+            self.usd_help.add_world_to_stage(self.world_cfg, base_frame="/World", enable_physics=False)
+            self.world.scene.add_default_ground_plane()
         self.gripper_joint_indices = []
 
         self.recorded_plan = []
@@ -246,6 +249,8 @@ class DualArmEnv:
         self.preferred_angles_combination = list(product(self.preferred_angles, repeat=2))
         self.all_angles = [901, 900, 450, -450, 451, -451]
         self.all_angles_combination = list(product(self.all_angles, repeat=2))
+        self.current_js = JointState.from_position(self.tensor_args.to_device([self.default_config]), self.j_names)
+        self.current_js = self.current_js.get_ordered_joint_state(self.single_motion_gen.kinematics.joint_names)
         # end of init
 
 
@@ -266,6 +271,9 @@ class DualArmEnv:
 
     
     def get_ready(self, reset=False, autostart=False):
+        if self.headless:
+            self.reset()
+            return
         i = 0
         while self.simulation_app.is_running():
             self.world.step(render=True)
@@ -458,6 +466,10 @@ class DualArmEnv:
         return dict(zip(self.gripper_primary_joints, gripper_positions))
     
     def gripper_control(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
+        if self.headless:
+            self.gripper_closed[self.arm1] = bool(gripper1_action.value)
+            self.gripper_closed[self.arm2] = bool(gripper2_action.value)
+            return
         dof_upper = self.robot.dof_properties["upper"]
         gripper_closed_pos = dof_upper[self.gripper_primary_indices[0]]
         gripper1_pos = gripper1_action.value * gripper_closed_pos
@@ -526,30 +538,41 @@ class DualArmEnv:
         self.visualize_plan(self.move_z(0.1, angle1, angle2))
     
     def reset(self):
-        self.world.reset()
-        # set gravity
-        physics_scene_path = "/physicsScene"
-        physics_scene = self.stage.GetPrimAtPath(physics_scene_path)
-        # Ensure the Physics Scene prim is valid
-        if physics_scene.IsValid():
-            # Set the gravity direction (e.g., (0, 0, -1) for downward gravity along the Z-axis)
-            gravity_direction_attr = physics_scene.GetAttribute("physics:gravityDirection")
-            if not gravity_direction_attr:
-                gravity_direction_attr = physics_scene.CreateAttribute("physics:gravityDirection", Gf.Vec3f)
-            gravity_direction_attr.Set(Gf.Vec3f(0.0, 0.0, -1.0))
+        if not self.headless:
+            self.world.reset()
+            # set gravity
+            physics_scene_path = "/physicsScene"
+            physics_scene = self.stage.GetPrimAtPath(physics_scene_path)
+            # Ensure the Physics Scene prim is valid
+            if physics_scene.IsValid():
+                # Set the gravity direction (e.g., (0, 0, -1) for downward gravity along the Z-axis)
+                gravity_direction_attr = physics_scene.GetAttribute("physics:gravityDirection")
+                if not gravity_direction_attr:
+                    gravity_direction_attr = physics_scene.CreateAttribute("physics:gravityDirection", Gf.Vec3f)
+                gravity_direction_attr.Set(Gf.Vec3f(0.0, 0.0, -1.0))
 
-            # Set the gravity magnitude (e.g., 9.81 for Earth's gravity)
-            gravity_magnitude_attr = physics_scene.GetAttribute("physics:gravityMagnitude")
-            if not gravity_magnitude_attr:
-                gravity_magnitude_attr = physics_scene.CreateAttribute("physics:gravityMagnitude", float)
-            gravity_magnitude_attr.Set(5.0)
-        else:
-            print(f"Physics Scene prim at {physics_scene_path} not found.")
+                # Set the gravity magnitude (e.g., 9.81 for Earth's gravity)
+                gravity_magnitude_attr = physics_scene.GetAttribute("physics:gravityMagnitude")
+                if not gravity_magnitude_attr:
+                    gravity_magnitude_attr = physics_scene.CreateAttribute("physics:gravityMagnitude", float)
+                gravity_magnitude_attr.Set(5.0)
+            else:
+                print(f"Physics Scene prim at {physics_scene_path} not found.")
 
+            idx_list = [self.robot.get_dof_index(x) for x in self.j_names]
+            self.robot.set_joint_positions(self.default_config, idx_list)
+            self.robot.set_joint_velocities(np.zeros(len(idx_list)), idx_list)
+            self.dof_names = self.robot.dof_names
+            self.robot._articulation_view.set_max_efforts(
+                values=np.array([5000 for i in range(len(idx_list))]), 
+                joint_indices=idx_list
+            )
+            if self.common_js_names == [] and self.common_js_indices == []:
+                for x in self.dof_names:
+                    if x in self.j_names_primary:
+                        self.common_js_indices.append(self.robot.get_dof_index(x))
+                        self.common_js_names.append(x)
 
-        idx_list = [self.robot.get_dof_index(x) for x in self.j_names]
-        self.robot.set_joint_positions(self.default_config, idx_list)
-        self.robot.set_joint_velocities(np.zeros(len(idx_list)), idx_list)
         kin_state = self.single_motion_gen.kinematics.get_state(self.single_motion_gen.get_retract_config().view(1, -1))
         link_poses = kin_state.link_poses
         self.default_ee_pos = {}
@@ -557,52 +580,42 @@ class DualArmEnv:
             t_pos = np.ravel(v.to_list())
             self.default_ee_pos[k] = t_pos[:3]
             self.default_ee_pos[k][2] += 0.15 #TODO: Test this, added 0.15m to z
-        sim_js = self.robot.get_joints_state()
-        self.dof_names = self.robot.dof_names
-        for pair in zip(self.dof_names, sim_js.positions):
-            print(pair)
         
-        if self.common_js_names == [] and self.common_js_indices == []:
-            for x in self.dof_names:
-                if x in self.j_names_primary:
-                    self.common_js_indices.append(self.robot.get_dof_index(x))
-                    self.common_js_names.append(x)
 
-        if self.visualize_spheres: 
+        if self.visualize_spheres and not self.headless: 
             self.visualize_robot_spheres()
 
-        self.robot._articulation_view.set_max_efforts(
-            values=np.array([5000 for i in range(len(idx_list))]), 
-            joint_indices=idx_list
-        )
 
-        self.gripper_joint_indices = []
-        for joint_name in self.gripper_joint_names:
-            dof_index = self.robot.get_dof_index(joint_name)
-            self.gripper_joint_indices.append(dof_index)
+        if not self.headless:
+            self.gripper_joint_indices = []
+            for joint_name in self.gripper_joint_names:
+                dof_index = self.robot.get_dof_index(joint_name)
+                self.gripper_joint_indices.append(dof_index)
 
-        self.gripper_primary_indices = []
-        for joint_name in self.gripper_primary_joints:
-            dof_index = self.robot.get_dof_index(joint_name)
-            self.gripper_primary_indices.append(dof_index)
+            self.gripper_primary_indices = []
+            for joint_name in self.gripper_primary_joints:
+                dof_index = self.robot.get_dof_index(joint_name)
+                self.gripper_primary_indices.append(dof_index)
             
         
         self.gripper_closed = {self.arm1: False, self.arm2: False}
         #TODO: This kind assignment is risky in the future. Fix it later
         self.gripper_primary_joints_dict = {self.arm1: self.gripper_primary_joints[0], self.arm2: self.gripper_primary_joints[1]}
         self.gripper_primary_indices_dict = {self.arm1: None, self.arm2: None}
-        for arm, joint_name in self.gripper_primary_joints_dict.items():
-            self.gripper_primary_indices_dict[arm] = self.robot.get_dof_index(joint_name)
+
+        if not self.headless:
+            for arm, joint_name in self.gripper_primary_joints_dict.items():
+                self.gripper_primary_indices_dict[arm] = self.robot.get_dof_index(joint_name)
+            self.robot._articulation_view.set_gains(
+                kps = 100 * np.ones(len(self.gripper_joint_indices)), 
+                kds= 100 * np.ones(len(self.gripper_joint_indices)), 
+                joint_indices=self.gripper_joint_indices
+                )
+            print("self.robot.dof_properties = ", self.robot.dof_properties)
+            self.add_objects_isaacsim()
         
         self.arm_joint_names = [name for name in self.j_names_primary if name not in self.gripper_primary_joints]
 
-        self.robot._articulation_view.set_gains(
-            kps = 100 * np.ones(len(self.gripper_joint_indices)), 
-            kds= 100 * np.ones(len(self.gripper_joint_indices)), 
-            joint_indices=self.gripper_joint_indices
-            )
-        print("self.robot.dof_properties = ", self.robot.dof_properties)
-        self.add_objects_isaacsim()
         self.sync_isaacsim_curobo()
         print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
     
@@ -707,26 +720,27 @@ class DualArmEnv:
         if needs_naive_plan:
             self.naive_motion_plan(task_plan)
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
+            print("goal_arm1 = ", goal_arm1)
+            print("goal_arm2 = ", goal_arm2)
             if result.success:
                 cmd_plan = self.get_plan_single(result)
                 cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
-                self.recorded_plan.append([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
+                self.add_plan_to_record(cmd_plan)
                 # go down
                 arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
                 arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
-
+                self.add_plan_to_record(cmd_plan)
                 self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
+                self.add_plan_to_record([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
                 # go up
                 arm1_delta_z = 2 * self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
                 arm2_delta_z = 2 * self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
             else:
                 # one arm by one arm
                 tmp_goal_arm1 = self.default_ee_pos[self.arm1]
@@ -735,44 +749,46 @@ class DualArmEnv:
                 result = self.plan_single_from_curr_js(goal_arm1=tmp_goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
                 cmd_plan = self.get_plan_single(result)
                 cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
 
                 # go down
                 arm1_delta_z = 0
                 arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
 
                 self.gripper_control(GripperAction(self.gripper_closed[self.arm1]), task_plan.arm2_gripper_action)
+                self.add_plan_to_record([GripperAction(self.gripper_closed[self.arm1]), task_plan.arm2_gripper_action])
                 # go up
                 arm1_delta_z = 0
                 arm2_delta_z = 2 * self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
 
                 # move the other arm
                 result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=tmp_goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
                 cmd_plan = self.get_plan_single(result)
                 cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
                 # go down
                 arm2_delta_z = 0
                 arm1_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
 
                 self.gripper_control(task_plan.arm1_gripper_action, GripperAction(self.gripper_closed[self.arm2]))
+                self.add_plan_to_record([task_plan.arm1_gripper_action, GripperAction(self.gripper_closed[self.arm2])])
                 # go up
                 arm2_delta_z = 0
                 arm1_delta_z = 2 * self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
 
         return task_execution_result
     
@@ -807,8 +823,8 @@ class DualArmEnv:
                         pos2[1] = max(pos2[1] - 0.3, -0.3)
                 
                 cmd_plan = self.move_ee(pos1, self.old_task_plan.arm1_angle, pos2, self.old_task_plan.arm2_angle)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
 
         # check left and right on the y-axis
         if 0 < pos2[0] - pos1[0] < 0.2:
@@ -818,8 +834,8 @@ class DualArmEnv:
                 pos1[1] = min(pos1[1] + delta_y, 0.3)
                 pos2[1] = max(pos2[1] - delta_y, -0.3)
                 cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
                 # cmd_plan_total = cmd_plan_total.stack(cmd_plan)
             elif -0.1 < pos1[1] - pos2[1] < 0:
                 # arm2 on the left
@@ -827,8 +843,8 @@ class DualArmEnv:
                 pos1[1] = max(pos1[1] - delta_y, -0.3)
                 pos2[1] = min(pos2[1] + delta_y, 0.3)
                 cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
-                self.recorded_plan.append(cmd_plan)
                 self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
             
         # move back a little bit to seperate them on x-axis
         if pos2[0] - pos1[0] < 0.3:
@@ -836,8 +852,8 @@ class DualArmEnv:
             pos1[0] = max(pos1[0]-delta_x, -0.3)
             pos2[0] = min(pos1[0]+delta_x, 0.3)
             cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
-            self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
+            self.add_plan_to_record(cmd_plan)
         
         # align with the goal on the y-axis
         ee_pos = self.get_current_ee_pos()
@@ -867,8 +883,8 @@ class DualArmEnv:
                     pos2[1] = max(min(goal_arm2[1] - 0.3, self.get_current_ee_pos()[self.arm2][1]-0.3), -0.3)
 
             cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
-            self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
+            self.add_plan_to_record(cmd_plan)
             
             # align with the goal on the x-axis
             if new_angle1 in [450, -450]:
@@ -877,16 +893,16 @@ class DualArmEnv:
                 pos2[0] = goal_arm2[0]
             
             cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
-            self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
+            self.add_plan_to_record(cmd_plan)
 
         else:
             pos1[1] = goal_arm1[1]
             pos2[1] = goal_arm2[1]
 
             cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
-            self.recorded_plan.append(cmd_plan)
             self.visualize_plan(cmd_plan)
+            self.add_plan_to_record(cmd_plan)
     
     def task_plan(self):
         task_plan = self.task.plan()
@@ -916,6 +932,7 @@ class DualArmEnv:
         while not self.task.finished():
             task_plan = self.task_plan()
             task_execution_result = self.motion_plan(task_plan)
+            self.old_task_plan = task_plan
             idx_to_sync = list(range(self.task.num_objects))
             sync_after_open = False
             sync_before_close = False
@@ -958,7 +975,6 @@ class DualArmEnv:
                 self.sync_isaacsim_curobo()
 
             self.check_object_collision_enabled()
-            self.old_task_plan = task_plan
             self.task.update(task_execution_result)
         return self.recorded_plan
     
@@ -1013,6 +1029,8 @@ class DualArmEnv:
         print()
 
     def get_current_js(self):
+        if self.headless:
+            return self.current_js
         sim_js = self.robot.get_joints_state()
         sim_js_positions = sim_js.positions.reshape(1, -1)
         cu_js = JointState.from_position(self.tensor_args.to_device(sim_js_positions), self.dof_names)
@@ -1043,12 +1061,19 @@ class DualArmEnv:
         if plan is None:
             print("Null JointState plan.")
             return
+        if self.headless:
+            self.current_js = JointState.from_position(plan[-1].position.reshape(1, -1), joint_names=self.j_names_primary)
+            return 
         cmd_idx = 0
         while self.simulation_app.is_running():
             self.world.step(render=True)
             if not self.world.is_playing():
                 continue
             cmd_state = plan[cmd_idx]
+            if cmd_state.joint_names == self.j_names_primary:
+                # cmd_state = cmd_state.get_ordered_joint_state(self.j_names_primary)
+                # cmd_state = self.single_motion_gen.get_full_js(cmd_state)
+                cmd_state = cmd_state.get_ordered_joint_state(self.common_js_names)
             # get full dof state
             positions = self.fix_gripper(cmd_state)
             velocities = cmd_state.velocity.cpu().numpy()
@@ -1168,7 +1193,7 @@ class DualArmEnv:
 
                 # pick the one buffer that is furthest to all the objects
                 available_buffers = buffers[success_indices.cpu().tolist()]
-                object_positions, _ = self.get_current_cube_pose()
+                object_positions = self.get_current_cube_pose()
                 furthest_buffer = None
                 max_min_dist = -1
                 for buffer in available_buffers:
@@ -1267,14 +1292,17 @@ class DualArmEnv:
     def get_plan_single(self, result: MotionGenResult):
         cmd_plan = result.get_interpolated_plan()
         cmd_plan = self.single_motion_gen.get_full_js(cmd_plan)
-        # get only joint names that are in both:
-        if self.common_js_names == [] and self.common_js_indices == []:
-            for x in self.dof_names:
-                if x in cmd_plan.joint_names:
-                    self.common_js_indices.append(self.robot.get_dof_index(x))
-                    self.common_js_names.append(x)
-    
-        cmd_plan = cmd_plan.get_ordered_joint_state(self.common_js_names)
+        if self.headless:
+            cmd_plan = cmd_plan.get_ordered_joint_state(self.j_names_primary)
+        else:
+            # get only joint names that are in both:
+            if self.common_js_names == [] and self.common_js_indices == []:
+                for x in self.dof_names:
+                    if x in cmd_plan.joint_names:
+                        self.common_js_indices.append(self.robot.get_dof_index(x))
+                        self.common_js_names.append(x)
+        
+            cmd_plan = cmd_plan.get_ordered_joint_state(self.common_js_names)
         return cmd_plan
 
     def fix_gripper(self, js: JointState):
@@ -1286,6 +1314,9 @@ class DualArmEnv:
         return positions
     
     def get_current_arm_js(self):
+        if self.headless:
+            cu_js = self.remove_gripper_dof_from_js(self.current_js)
+            return cu_js
         sim_js = self.robot.get_joints_state()
         sim_js_positions = sim_js.positions.reshape(1, -1)
         cu_js = JointState.from_position(self.tensor_args.to_device(sim_js_positions), self.dof_names)
@@ -1321,7 +1352,7 @@ class DualArmEnv:
         material_name: str,
         object_path: str,
         color: List[float],
-        obj_prim: Usd.Prim,
+        obj_prim, #Usd.Prim
         material: Material = Material(),
     ):
         mat_path = join_path(object_path, material_name)
@@ -1349,7 +1380,7 @@ class DualArmEnv:
         dynamic_friction: float,
         static_friction: float,
         restitution: float,
-        obj_prim: Usd.Prim,
+        obj_prim, #Usd.Prim
     ):
         mat_path = join_path(object_path, material_name)
         material_api = UsdPhysics.MaterialAPI.Apply(obj_prim.GetPrim())
@@ -1394,27 +1425,46 @@ class DualArmEnv:
             self.visualize_plan(cmd)
     
     def get_current_cube_pose(self):
+        if self.headless:
+            return self.task.get_starts()
         positions = []
         rotations = []
         for i in range(self.task.num_objects):
             cube_isaac = self.objects_isaacsim_dynamic[i]
             p, q = cube_isaac.get_world_pose()
             positions.append(p)
-            rotations.append(q)
-        return positions, rotations
+            # rotations.append(q)
+        return positions#, rotations
 
     def sync_isaacsim_curobo(self, idx_to_sync: list = None):
-        cuboids = []
+        #TODO: provide functionality for headless mode
         if idx_to_sync is None:
             idx_to_sync = list(range(self.task.num_objects))
         new_starts = {}
-        for i in idx_to_sync:
-            cube_isaac = self.objects_isaacsim_dynamic[i]
-            cube_curobo = self.objects_curobo[i]
-            p, q = cube_isaac.get_world_pose()
-            cube_curobo.pose = [p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
-            cuboids.append(cube_curobo)
-            new_starts[i] = np.array([p[0], p[1], p[2]])
+        cuboids = []
+        if not self.headless:
+            for i in idx_to_sync:
+                cube_isaac = self.objects_isaacsim_dynamic[i]
+                cube_curobo = self.objects_curobo[i]
+                p, q = cube_isaac.get_world_pose()
+                cube_curobo.pose = [p[0], p[1], p[2], q[0], q[1], q[2], q[3]]
+                cuboids.append(cube_curobo)
+                new_starts[i] = np.array([p[0], p[1], p[2]])
+        else:
+            if self.old_task_plan is None:
+                return
+            arm1_id = self.old_task_plan.arm1_assigned_object
+            arm2_id = self.old_task_plan.arm2_assigned_object
+            if arm1_id != -1 and arm1_id is not None:
+                new_starts[arm1_id] = self.task.get_goal(arm1_id)
+            if arm2_id != -1 and arm2_id is not None:
+                new_starts[arm2_id] = self.task.get_goal(arm2_id)
+            for i in idx_to_sync:
+                cube_curobo = self.objects_curobo[i]
+                p = self.task.get_start(i)
+                cube_curobo.pose = [p[0], p[1], p[2], 1, 0, 0, 0]
+                cuboids.append(cube_curobo)
+
         self.task.set_starts(new_starts)
         world_cfg_table = WorldConfig.from_dict(
             load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
@@ -1463,16 +1513,23 @@ class DualArmEnv:
         ik_result = self.ik_solve_single(pos1, pos2, angle1, angle2, num_solutions=1)
         curr_js = self.get_current_arm_js()
         curr_js = self.single_motion_gen.get_full_js(curr_js)
-        if self.common_js_names == [] and self.common_js_indices == []:
-            for x in self.dof_names:
-                if x in curr_js.joint_names:
-                    self.common_js_indices.append(self.robot.get_dof_index(x))
-                    self.common_js_names.append(x)
-        curr_js = curr_js.get_ordered_joint_state(self.common_js_names)
-        start_js = curr_js.position.squeeze(0).view(-1)
-        goal_js = ik_result.js_solution.get_ordered_joint_state(self.common_js_names).position.squeeze(0).view(-1)
-        traj = self.interpolate_joint_states(curr_js.position, goal_js)
-        cmd_plan = JointState.from_position(traj, self.common_js_names)
+        if self.headless:
+            curr_js = curr_js.get_ordered_joint_state(self.j_names_primary)
+            start_js = curr_js.position.squeeze(0).view(-1)
+            goal_js = ik_result.js_solution.get_ordered_joint_state(self.j_names_primary).position.squeeze(0).view(-1)
+            traj = self.interpolate_joint_states(curr_js.position, goal_js)
+            cmd_plan = JointState.from_position(traj, self.j_names_primary)
+        else:
+            if self.common_js_names == [] and self.common_js_indices == []:
+                for x in self.dof_names:
+                    if x in curr_js.joint_names:
+                        self.common_js_indices.append(self.robot.get_dof_index(x))
+                        self.common_js_names.append(x)
+            curr_js = curr_js.get_ordered_joint_state(self.common_js_names)
+            start_js = curr_js.position.squeeze(0).view(-1)
+            goal_js = ik_result.js_solution.get_ordered_joint_state(self.common_js_names).position.squeeze(0).view(-1)
+            traj = self.interpolate_joint_states(curr_js.position, goal_js)
+            cmd_plan = JointState.from_position(traj, self.common_js_names)
         return cmd_plan
     
     def move_z(self, delta, angle1, angle2):
@@ -1567,7 +1624,10 @@ class DualArmEnv:
         toppra_duration = jnt_traj.duration
         traj = jnt_traj.eval(np.linspace(0, toppra_duration, int(toppra_duration/(self.interpolation_dt))))
         traj = self.tensor_args.to_device(traj)
-        traj = JointState.from_position(traj.view(-1,waypoints_.shape[1]))
+        if self.headless:
+            traj = JointState.from_position(traj.view(-1,waypoints_.shape[1]), joint_names=self.j_names_primary)
+        else:
+            traj = JointState.from_position(traj.view(-1,waypoints_.shape[1]), joint_names=self.dof_names)
         return traj
     
     def play(self, recorded_plan):
@@ -1578,6 +1638,12 @@ class DualArmEnv:
             else:
                 self.visualize_plan(section)
 
+    def add_plan_to_record(self, cmd_plan:JointState|List):
+        if isinstance(cmd_plan, list):
+            self.recorded_plan.append(cmd_plan)
+        else:
+            assert cmd_plan.joint_names is not None
+            self.recorded_plan.append(cmd_plan)
 
 # debug
 if __name__ == '__main__':
