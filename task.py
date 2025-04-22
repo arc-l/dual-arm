@@ -513,7 +513,6 @@ class Task:
         # Layout setup
         section_width = width / 3 - Inches(0.5)
         section_margin = Inches(0.25)
-        top_margin = Inches(1.0)
 
         # VISUAL SIZE SETTINGS
         visual_table_size_inch = 3.0  # how large to draw the table
@@ -521,14 +520,13 @@ class Task:
         visual_object_size = self.object_size * scale  # scaled size of each square
         rect_size = Inches(visual_object_size)
         visual_table_size_inch = Inches(visual_table_size_inch)
-        print(f"Visual object size: {visual_object_size} inches")
-        print(f"rect_size: {rect_size} inches")
-        print(f"scale: {scale}")
 
         def draw_scene(scene_type, x_offset):
             # Draw the table (centered at 0,0)
-            table_left = x_offset + section_width / 2 - visual_table_size_inch / 2
-            table_top = top_margin + visual_table_size_inch / 2
+            table_center_x = x_offset + section_width / 2
+            table_center_y = height / 2
+            table_left = table_center_x - visual_table_size_inch / 2
+            table_top = height / 2 - visual_table_size_inch / 2
             table_rect = slide.shapes.add_shape(
                 MSO_SHAPE.RECTANGLE,
                 table_left, table_top,
@@ -544,10 +542,10 @@ class Task:
                 start = self.get_start(i)
                 goal = self.get_goal(i)
 
-                def draw_box(xy, label):
-                    x, y = xy[0], xy[1]
-                    left = x_offset + section_width / 2 + scale * x - rect_size / 2
-                    top = table_top + scale * y - rect_size / 2
+                def draw_box(xy, origin, label):
+                    x, y = xy[0] + origin[0], xy[1] + origin[1]
+                    left = scale * x - rect_size / 2
+                    top =  scale * y - rect_size / 2
                     shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, rect_size, rect_size)
                     fill = shape.fill
                     fill.solid()
@@ -562,13 +560,13 @@ class Task:
                     p.alignment = 1  # center
 
                 if scene_type in ['start', 'overlay']:
-                    draw_box(start, i)
+                    draw_box(start, (table_center_x, table_center_y), i)
                 if scene_type in ['goal', 'overlay']:
-                    draw_box(goal, i)
+                    draw_box(goal, (table_center_x, table_center_y), i)
 
         draw_scene('start', section_margin)
-        draw_scene('goal', section_margin + section_width + Inches(0.5))
-        draw_scene('overlay', section_margin + 2 * (section_width + Inches(0.5)))
+        draw_scene('goal', section_margin + section_width + section_margin)
+        draw_scene('overlay', section_margin + 2 * (section_width + section_margin))
 
         prs.save(ppt_path)
         print(f"Saved triptych slide to: {ppt_path}")
