@@ -129,8 +129,8 @@ class DualArmEnv:
         if not self.headless:
             self.robot, self.robot_prim_path = add_robot_to_scene(self.robot_cfg, self.world)
             self.set_material_for_finger_pads()
-            self.dof_names = []
             # Check screen boundaries
+            self.dof_names = []
             self.articulation_controller = self.robot.get_articulation_controller()
             add_extensions(self.simulation_app, None)
 
@@ -250,8 +250,9 @@ class DualArmEnv:
         self.all_angles = [901, 900, 450, -450, 451, -451]
         self.all_angles_combination = list(product(self.all_angles, repeat=2))
         self.current_js = JointState.from_position(self.tensor_args.to_device([self.default_config]), self.j_names)
-        self.current_js = self.current_js.get_ordered_joint_state(self.single_motion_gen.kinematics.joint_names)
+        self.current_js = self.current_js.get_ordered_joint_state(self.j_names_primary)
         # end of init
+        print()
 
 
     
@@ -614,7 +615,8 @@ class DualArmEnv:
             print("self.robot.dof_properties = ", self.robot.dof_properties)
             self.add_objects_isaacsim()
         
-        self.arm_joint_names = [name for name in self.j_names_primary if name not in self.gripper_primary_joints]
+        # self.arm_joint_names = [name for name in self.j_names_primary if name not in self.gripper_primary_joints]
+        self.arm_joint_names = self.single_motion_gen.kinematics.joint_names
 
         self.sync_isaacsim_curobo()
         print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
@@ -719,6 +721,7 @@ class DualArmEnv:
 
         if needs_naive_plan:
             self.naive_motion_plan(task_plan)
+            print("ee_pos before before: ", self.get_current_ee_pos())
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
             print("goal_arm1 = ", goal_arm1)
             print("goal_arm2 = ", goal_arm2)
@@ -728,10 +731,12 @@ class DualArmEnv:
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
                 # go down
+                print("ee_pos before: ", self.get_current_ee_pos())
                 arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
                 arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
+                print("ee_pos after: ", self.get_current_ee_pos())
                 self.add_plan_to_record(cmd_plan)
                 self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
                 self.add_plan_to_record([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
@@ -796,6 +801,7 @@ class DualArmEnv:
         new_angle1 = task_plan.arm1_angle
         new_angle2 = task_plan.arm2_angle
         ee_pos = self.get_current_ee_pos()
+        print("ee_pos in naive_motion_plan: ", ee_pos)
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
 
@@ -1030,11 +1036,12 @@ class DualArmEnv:
 
     def get_current_js(self):
         if self.headless:
-            return self.current_js
+            cu_js = self.current_js.get_ordered_joint_state(self.arm_joint_names)
+            return cu_js
         sim_js = self.robot.get_joints_state()
         sim_js_positions = sim_js.positions.reshape(1, -1)
         cu_js = JointState.from_position(self.tensor_args.to_device(sim_js_positions), self.dof_names)
-        cu_js = cu_js.get_ordered_joint_state(self.single_motion_gen.kinematics.joint_names)
+        cu_js = cu_js.get_ordered_joint_state(self.arm_joint_names)
         return cu_js
         
     def visualize_robot_spheres(self):
@@ -1062,7 +1069,8 @@ class DualArmEnv:
             print("Null JointState plan.")
             return
         if self.headless:
-            self.current_js = JointState.from_position(plan[-1].position.reshape(1, -1), joint_names=self.j_names_primary)
+            cu_js = plan[-1].get_ordered_joint_state(self.j_names_primary)
+            self.current_js = JointState.from_position(self.tensor_args.to_device(cu_js.position.reshape(1, -1)), self.j_names_primary)
             return 
         cmd_idx = 0
         while self.simulation_app.is_running():
@@ -1611,6 +1619,7 @@ class DualArmEnv:
     
     def toppra_improvement(self, traj: JointState, speed_scale=0.5, acc_scale=1.0):
         waypoints_ = traj.position.cpu().numpy()
+        joint_names = traj.joint_names
         max_accelerations = np.array([[-40.0*acc_scale, 40.0*acc_scale]]*traj[0].shape[0])
         max_velocities = np.array([[-np.pi * speed_scale, np.pi * speed_scale]]*traj[0].shape[0])
         path = ta.SplineInterpolator(np.linspace(0, 1, traj.shape[0]), waypoints_)
@@ -1625,7 +1634,7 @@ class DualArmEnv:
         traj = jnt_traj.eval(np.linspace(0, toppra_duration, int(toppra_duration/(self.interpolation_dt))))
         traj = self.tensor_args.to_device(traj)
         if self.headless:
-            traj = JointState.from_position(traj.view(-1,waypoints_.shape[1]), joint_names=self.j_names_primary)
+            traj = JointState.from_position(traj.view(-1,waypoints_.shape[1]), joint_names=joint_names)
         else:
             traj = JointState.from_position(traj.view(-1,waypoints_.shape[1]), joint_names=self.dof_names)
         return traj
