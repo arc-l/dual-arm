@@ -34,7 +34,7 @@
                 // "data/task_running_example.json",
                 // "data/task_fixed_cycled_4_objects.json",
                 "--method",
-                "ours"
+                "baseline"
             ]
         },
         {
