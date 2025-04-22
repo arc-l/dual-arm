@@ -9,6 +9,12 @@ from dependency_graph import DependencyGraph
 from dataclasses import dataclass
 from enum import Enum
 import json
+import os
+import numpy as np
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.dml.color import RGBColor
 
 class TaskState(Enum):
     IN_PROGRESS = 1
@@ -480,6 +486,93 @@ class Task:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Saved visualization to: {save_path}")
         plt.close(fig)
+    
+
+
+    def draw_triptych_to_ppt(self, ppt_path="triptych_slide.pptx", slide_title="Start, Goal, and Overlay"):
+        """
+        Draws a triptych (start, goal, overlay) of the task into a PowerPoint slide.
+        Uses a fixed visual table size and scales all positions and object sizes proportionally.
+        """
+        if os.path.exists(ppt_path):
+            print(f"Opening existing presentation: {ppt_path}")
+            prs = Presentation(ppt_path)
+        else:
+            print(f"Creating new presentation: {ppt_path}")
+            prs = Presentation()
+
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        width, height = prs.slide_width, prs.slide_height
+
+        # Title
+        title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), width - Inches(1), Inches(0.5))
+        tf = title_box.text_frame
+        tf.text = slide_title
+        tf.paragraphs[0].font.size = Pt(24)
+
+        # Layout setup
+        section_width = width / 3 - Inches(0.5)
+        section_margin = Inches(0.25)
+        top_margin = Inches(1.0)
+
+        # VISUAL SIZE SETTINGS
+        visual_table_size_inch = 3.0  # how large to draw the table
+        scale = visual_table_size_inch / self.map_width  # scale factor for positions
+        visual_object_size = self.object_size * scale  # scaled size of each square
+        rect_size = Inches(visual_object_size)
+        visual_table_size_inch = Inches(visual_table_size_inch)
+        print(f"Visual object size: {visual_object_size} inches")
+        print(f"rect_size: {rect_size} inches")
+        print(f"scale: {scale}")
+
+        def draw_scene(scene_type, x_offset):
+            # Draw the table (centered at 0,0)
+            table_left = x_offset + section_width / 2 - visual_table_size_inch / 2
+            table_top = top_margin + visual_table_size_inch / 2
+            table_rect = slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                table_left, table_top,
+                visual_table_size_inch, visual_table_size_inch
+            )
+            table_fill = table_rect.fill
+            table_fill.solid()
+            table_fill.fore_color.rgb = RGBColor(230, 230, 230)
+            table_rect.line.color.rgb = RGBColor(180, 180, 180)
+
+            for i in range(self.num_objects):
+                color = tuple(int(c * 255) for c in self.colors[i][:3])
+                start = self.get_start(i)
+                goal = self.get_goal(i)
+
+                def draw_box(xy, label):
+                    x, y = xy[0], xy[1]
+                    left = x_offset + section_width / 2 + scale * x - rect_size / 2
+                    top = table_top + scale * y - rect_size / 2
+                    shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, rect_size, rect_size)
+                    fill = shape.fill
+                    fill.solid()
+                    fill.fore_color.rgb = RGBColor(*color)
+                    shape.line.color.rgb = RGBColor(0, 0, 0)
+                    shape.line.width = Pt(1)
+
+                    label_box = slide.shapes.add_textbox(left, top, rect_size, rect_size)
+                    label_box.text = str(label)
+                    p = label_box.text_frame.paragraphs[0]
+                    p.font.size = Pt(10)
+                    p.alignment = 1  # center
+
+                if scene_type in ['start', 'overlay']:
+                    draw_box(start, i)
+                if scene_type in ['goal', 'overlay']:
+                    draw_box(goal, i)
+
+        draw_scene('start', section_margin)
+        draw_scene('goal', section_margin + section_width + Inches(0.5))
+        draw_scene('overlay', section_margin + 2 * (section_width + Inches(0.5)))
+
+        prs.save(ppt_path)
+        print(f"Saved triptych slide to: {ppt_path}")
+
     
     def get_starts(self):
         return self.starts
@@ -999,3 +1092,4 @@ if __name__ == '__main__':
     task.draw_dependency_graph("results/dependency_graph.png")
     task.draw_start_goal_pair("results/start_goal_pair.png")
     task.write_to_json("data/task_running_example.json")
+    task.draw_triptych_to_ppt("results/triptych_slide.pptx", slide_title="Running Example")
