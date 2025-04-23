@@ -15,6 +15,9 @@ from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_CONNECTOR
+from pptx.oxml import parse_xml
+from pptx.enum.shapes import MSO_CONNECTOR_TYPE
 
 class TaskState(Enum):
     IN_PROGRESS = 1
@@ -543,9 +546,9 @@ class Task:
                 goal = self.get_goal(i)
 
                 def draw_box(xy, origin, label):
-                    x, y = xy[0] + origin[0], xy[1] + origin[1]
-                    left = scale * x - rect_size / 2
-                    top =  scale * y - rect_size / 2
+                    x, y = xy[0], xy[1]
+                    left = origin[0] + Inches(scale * x) - rect_size / 2
+                    top =  origin[1] - Inches(scale * y) - rect_size / 2
                     shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, rect_size, rect_size)
                     fill = shape.fill
                     fill.solid()
@@ -571,7 +574,116 @@ class Task:
         prs.save(ppt_path)
         print(f"Saved triptych slide to: {ppt_path}")
 
-    
+    def draw_start_goal_dependency_to_ppt(self, ppt_path="triptych_depgraph.pptx", slide_title="Start, Goal, and Dependency Graph"):
+        """
+        Draws start, goal, and dependency graph views into a PowerPoint slide using elbow connectors.
+        """
+        if os.path.exists(ppt_path):
+            print(f"Opening existing presentation: {ppt_path}")
+            prs = Presentation(ppt_path)
+        else:
+            print(f"Creating new presentation: {ppt_path}")
+            prs = Presentation()
+
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        width, height = prs.slide_width, prs.slide_height
+
+        # Title
+        # title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), width - Inches(1), Inches(0.5))
+        # tf = title_box.text_frame
+        # tf.text = slide_title
+        # tf.paragraphs[0].font.size = Pt(24)
+
+        section_width = width / 3 - Inches(0.5)
+        section_margin = Inches(0.25)
+
+        visual_table_size_inch = 3.0
+        scale = visual_table_size_inch / self.map_width
+        rect_size = Inches(self.object_size * scale)
+        visual_table_size_inch = Inches(visual_table_size_inch)
+
+        def get_edge_center(from_pt, to_pt):
+            dx, dy = to_pt[0] - from_pt[0], to_pt[1] - from_pt[1]
+            if abs(dx) > abs(dy):
+                return (from_pt[0] + np.sign(dx) * self.object_size / 2, from_pt[1])
+            else:
+                return (from_pt[0], from_pt[1] + np.sign(dy) * self.object_size / 2)
+
+        def draw_scene(scene_type, x_offset):
+            center_x = x_offset + section_width / 2
+            center_y = height / 2
+
+            # Table
+            # table_left = center_x - visual_table_size_inch / 2
+            # table_top = center_y - visual_table_size_inch / 2
+            # table_rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, table_left, table_top,
+            #                                     visual_table_size_inch, visual_table_size_inch)
+            # table_fill = table_rect.fill
+            # table_fill.solid()
+            # table_fill.fore_color.rgb = RGBColor(230, 230, 230)
+            # table_rect.line.color.rgb = RGBColor(180, 180, 180)
+
+            # Object Rectangles
+            for i in range(self.num_objects):
+                color = tuple(int(c * 255) for c in self.colors[i][:3])
+                start = self.get_start(i)
+                goal = self.get_goal(i)
+
+                def draw_box(xy, label):
+                    x, y = xy[0], xy[1]
+                    left = center_x + Inches(scale * x) - rect_size / 2
+                    top = center_y - Inches(scale * y) - rect_size / 2
+                    shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, rect_size, rect_size)
+                    fill = shape.fill
+                    fill.solid()
+                    fill.fore_color.rgb = RGBColor(*color)
+                    shape.line.color.rgb = RGBColor(0, 0, 0)
+                    shape.line.width = Pt(1)
+                    label_box = slide.shapes.add_textbox(left, top, rect_size, rect_size)
+                    label_box.text = str(label)
+                    p = label_box.text_frame.paragraphs[0]
+                    p.font.size = Pt(10)
+                    p.alignment = 1
+
+                # if scene_type in ['start', 'dependency']:
+                #     draw_box(start, i)
+                # if scene_type == 'goal':
+                #     draw_box(goal, i)
+
+            # Dependency arrows
+            if scene_type == 'dependency':
+                for dependent, interfering_set in self.dependency_graph.dependency_graph.items():
+                    dest = self.start_dict[dependent]
+                    for interfering in interfering_set:
+                        source = self.start_dict[interfering]
+                        src_edge = get_edge_center(source, dest)
+                        dst_edge = get_edge_center(dest, source)
+
+                        sx = center_x + Inches(scale * src_edge[0])
+                        sy = center_y - Inches(scale * src_edge[1])
+                        dx = center_x + Inches(scale * dst_edge[0])
+                        dy = center_y - Inches(scale * dst_edge[1])
+                        print(f"sx: {sx}, sy: {sy}, dx: {dx}, dy: {dy}")
+
+                        connector = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, sx, sy, dx, dy)
+                        connector.line.color.rgb = RGBColor(0, 0, 0)
+                        connector.line.width = Pt(2)
+                        connector.line.end_arrowhead = True
+                        line_elem = connector.line._get_or_add_ln()
+                        line_elem.append(parse_xml("""
+                                <a:headEnd type="arrow" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
+                        """))
+                        break
+                    break
+
+
+        draw_scene('start', section_margin)
+        draw_scene('goal', section_margin + section_width + section_margin)
+        draw_scene('dependency', section_margin + 2 * (section_width + section_margin))
+
+        prs.save(ppt_path)
+        print(f"Saved triptych with dependency graph to: {ppt_path}")
+ 
     def get_starts(self):
         return self.starts
     
@@ -1090,4 +1202,4 @@ if __name__ == '__main__':
     task.draw_dependency_graph("results/dependency_graph.png")
     task.draw_start_goal_pair("results/start_goal_pair.png")
     task.write_to_json("data/task_running_example.json")
-    task.draw_triptych_to_ppt("results/triptych_slide.pptx", slide_title="Running Example")
+    task.draw_start_goal_dependency_to_ppt("results/test.pptx", slide_title="Running Example with Dependency Graph")

@@ -1,28 +1,41 @@
 from pptx import Presentation
-from pptx.util import Inches
-from pptx.enum.shapes import MSO_SHAPE
+from pptx.util import Inches, Pt
+from pptx.enum.shapes import MSO_CONNECTOR
 from pptx.dml.color import RGBColor
+from pptx.oxml import parse_xml
 
-# Create a new presentation
 prs = Presentation()
+slide = prs.slides.add_slide(prs.slide_layouts[5])
 
-# Add a blank slide layout
-blank_slide_layout = prs.slide_layouts[6]
-slide = prs.slides.add_slide(blank_slide_layout)
+start_x = Inches(2.5)
+start_y = Inches(2)
+end_x = Inches(4)
+end_y = Inches(4)
 
-# Define position and size of the shape
-left = Inches(2)
-top = Inches(2)
-width = Inches(4)
-height = Inches(1.5)
+print(f"start_x: {start_x}, start_y: {start_y}, end_x: {end_x}, end_y: {end_y}")
+connector = slide.shapes.add_connector(
+    MSO_CONNECTOR.STRAIGHT,
+    start_x, start_y,
+    end_x, end_y
+)
+connector.line.color.rgb = RGBColor(0, 0, 0)
+connector.line.width = Pt(2)
+connector.line.end_arrowhead = True
+line_elem = connector.line._get_or_add_ln()
+line_elem.append(parse_xml("""
+        <a:headEnd type="arrow" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
+"""))
 
-# Add a rectangle shape
-shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
-
-# Customize the fill color
-fill = shape.fill
-fill.solid()
-fill.fore_color.rgb = RGBColor(255, 0, 0)  # Red color
-
-# Save the presentation
-prs.save('custom_shape.pptx')
+connector = slide.shapes.add_connector(
+    MSO_CONNECTOR.STRAIGHT,
+    end_x, end_y,
+    start_x, start_y
+)
+connector.line.color.rgb = RGBColor(0, 0, 0)
+connector.line.width = Pt(2)
+connector.line.end_arrowhead = True
+line_elem = connector.line._get_or_add_ln()
+line_elem.append(parse_xml("""
+        <a:headEnd type="arrow" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
+"""))
+prs.save("results/test_connector.pptx")
