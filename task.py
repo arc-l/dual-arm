@@ -589,10 +589,10 @@ class Task:
         width, height = prs.slide_width, prs.slide_height
 
         # Title
-        # title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), width - Inches(1), Inches(0.5))
-        # tf = title_box.text_frame
-        # tf.text = slide_title
-        # tf.paragraphs[0].font.size = Pt(24)
+        title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), width - Inches(1), Inches(0.5))
+        tf = title_box.text_frame
+        tf.text = slide_title
+        tf.paragraphs[0].font.size = Pt(24)
 
         section_width = width / 3 - Inches(0.5)
         section_margin = Inches(0.25)
@@ -614,14 +614,14 @@ class Task:
             center_y = height / 2
 
             # Table
-            # table_left = center_x - visual_table_size_inch / 2
-            # table_top = center_y - visual_table_size_inch / 2
-            # table_rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, table_left, table_top,
-            #                                     visual_table_size_inch, visual_table_size_inch)
-            # table_fill = table_rect.fill
-            # table_fill.solid()
-            # table_fill.fore_color.rgb = RGBColor(230, 230, 230)
-            # table_rect.line.color.rgb = RGBColor(180, 180, 180)
+            table_left = center_x - visual_table_size_inch / 2
+            table_top = center_y - visual_table_size_inch / 2
+            table_rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, table_left, table_top,
+                                                visual_table_size_inch, visual_table_size_inch)
+            table_fill = table_rect.fill
+            table_fill.solid()
+            table_fill.fore_color.rgb = RGBColor(230, 230, 230)
+            table_rect.line.color.rgb = RGBColor(180, 180, 180)
 
             # Object Rectangles
             for i in range(self.num_objects):
@@ -645,10 +645,10 @@ class Task:
                     p.font.size = Pt(10)
                     p.alignment = 1
 
-                # if scene_type in ['start', 'dependency']:
-                #     draw_box(start, i)
-                # if scene_type == 'goal':
-                #     draw_box(goal, i)
+                if scene_type in ['start', 'dependency']:
+                    draw_box(start, i)
+                if scene_type == 'goal':
+                    draw_box(goal, i)
 
             # Dependency arrows
             if scene_type == 'dependency':
@@ -673,8 +673,6 @@ class Task:
                         line_elem.append(parse_xml("""
                                 <a:headEnd type="arrow" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
                         """))
-                        break
-                    break
 
 
         draw_scene('start', section_margin)
