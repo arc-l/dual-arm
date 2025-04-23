@@ -665,13 +665,26 @@ class Task:
                         dy = center_y - Inches(scale * dst_edge[1])
                         print(f"sx: {sx}, sy: {sy}, dx: {dx}, dy: {dy}")
 
+                        if sx == dx and sy == dy:
+                            print("❌ Skipping degenerate connector")
+                            return
+
+                        if sx < 0 or sy < 0 or dx < 0 or dy < 0:
+                            print("❌ Skipping connector with negative coords")
+                            return
+ 
+
                         connector = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, sx, sy, dx, dy)
                         connector.line.color.rgb = RGBColor(0, 0, 0)
                         connector.line.width = Pt(2)
                         connector.line.end_arrowhead = True
                         line_elem = connector.line._get_or_add_ln()
+                        # line_elem.append(parse_xml("""
+                        #         <a:headEnd type="arrow" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
+                        # """))
                         line_elem.append(parse_xml("""
-                                <a:headEnd type="arrow" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
+                            <a:tailEnd type="arrow" w="lg" len="lg"
+                            xmlns:a="http://schemas.openxmlformats.org/drawingml/2023/main"/>
                         """))
 
 

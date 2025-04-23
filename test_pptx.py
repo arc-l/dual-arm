@@ -1,6 +1,6 @@
 from pptx import Presentation
 from pptx.util import Inches, Pt
-from pptx.enum.shapes import MSO_CONNECTOR
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.dml.color import RGBColor
 from pptx.oxml import parse_xml
 
@@ -11,7 +11,7 @@ start_x = Inches(2.5)
 start_y = Inches(2)
 end_x = Inches(4)
 end_y = Inches(4)
-
+shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(1), Inches(1), Inches(2), Inches(2))
 print(f"start_x: {start_x}, start_y: {start_y}, end_x: {end_x}, end_y: {end_y}")
 connector = slide.shapes.add_connector(
     MSO_CONNECTOR.STRAIGHT,
