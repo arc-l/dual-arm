@@ -321,8 +321,8 @@ class Task:
         self.starts = deepcopy(cycle_starts) + deepcopy(chain_starts) + deepcopy(independent_starts)
         self.goals = deepcopy(cycle_goals) + deepcopy(chain_goals) + deepcopy(independent_goals)
         self.starts[8][0] = self.starts[3][0]
-        self.starts[8][1] = self.starts[3][1] - self.object_size / 3. * 2
-        self.starts[3][1] += self.object_size / 3. * 2 
+        self.starts[8][1] = self.starts[3][1] - self.object_size / 3. * 4
+        self.goals[2][1] = (self.starts[8][1] + self.starts[3][1]) / 2
 
         
         self.num_objects = len(self.starts)
@@ -337,37 +337,88 @@ class Task:
         pos = np.array([x, y, self.object_size/2])
         return pos
     
-    def generate(self, cycled=False) -> None:
-        """Generate random start and goal positions with optional cycling behavior."""
-        self.starts = []
-        self.goals = []
-
-        self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
+    def generate_random_postions(self, num_objects, collision_avoidance_list=None, clearance=0.0):
         cnt = 0
-
+        results = []
+        if collision_avoidance_list is None:
+            collision_avoidance_list = []
+        else:
+            collision_avoidance_list = deepcopy(collision_avoidance_list)
         # Generate random unique start positions
-        for i in range(self.num_objects):
-            start = self.random_position()
-            while self.check_collision(self.starts, start):
-                start = self.random_position()
+        for i in range(num_objects):
+            pos = self.random_position()
+            while self.check_collision(collision_avoidance_list, pos, clearance=clearance):
+                pos = self.random_position()
                 if cnt > 1000:
                     raise RuntimeError('Cannot generate task configuration')
                 cnt += 1
-            self.starts.append(start)
+            results.append(pos)
+            collision_avoidance_list.append(pos)
+        return results
+    
+    def generate(self, gen_type="random", clearance=0.0) -> None:
+        """Generate random start and goal positions with optional cycling behavior."""
+        self.starts = []
+        self.goals = []
+        self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
 
-        if cycled:
-            # Create a cyclic goal configuration
-            self.goals = self.starts[1:] + [self.starts[0]]
-        else:
-            cnt = 0
-            for i in range(self.num_objects):
-                goal = self.random_position()
-                while self.check_collision(self.goals, goal):
-                    goal = self.random_position()
-                    if cnt > 1000:
-                        raise RuntimeError('Cannot generate task configuration')
-                    cnt += 1
-                self.goals.append(goal)
+        match gen_type:
+            case "random":
+                self.starts = self.generate_random_postions(self.num_objects, clearance=clearance)
+                self.goals = self.generate_random_postions(self.num_objects, clearance=clearance)
+            case "cycled":
+                self.starts = self.generate_random_postions(self.num_objects, clearance=clearance)
+                # Create a cyclic goal configuration
+                self.goals = self.starts[1:] + [self.starts[0]]
+            case "double_cycle":
+                assert self.num_objects > 4, "Number of objects must be greater than 4 for double cycle."
+                # generate the knot of the cycle
+                start1 = self.random_position()
+                start2 = deepcopy(start1)
+                if start1[0] + 4/3 * self.object_size < self.map_width/2 - self.object_size:
+                    start2[0] += 4/3 * self.object_size
+                else:
+                    start2[0] -= 4/3 * self.object_size
+                
+                # ajust the y position of start1 and start2. Only one while loop should run
+                while start1[1] + 2/3 * self.object_size > self.map_length/2 - self.object_size:
+                    start1[1] -= 2 * self.object_size
+                while start1[1] - 2/3 * self.object_size < -self.map_length/2 + self.object_size:
+                    start1[1] += 2 * self.object_size
+                
+                goal1 = deepcopy(start1)
+                goal1[0] = (start1[0] + start2[0])/2
+                goal2 = deepcopy(goal1)
+                goal1[1] += 2/3 * self.object_size
+                goal2[1] -= 2/3 * self.object_size
+                
+                collision_avoidance_list = [start1, start2]
+
+                # pick a cycle size for the first cycle
+                cycle_size1 = np.random.randint(2, self.num_objects - 2)
+                cycle_size2 = self.num_objects - cycle_size1
+                cycle_starts1 = self.generate_random_postions(cycle_size1, collision_avoidance_list=collision_avoidance_list, clearance=clearance)
+                cycle_starts2 = self.generate_random_postions(cycle_size2, collision_avoidance_list=cycle_starts1+collision_avoidance_list, clearance=clearance)
+                # pick one object from cycle 1
+                cycle_id_1 = np.random.randint(0, cycle_size1)
+                cycle_id_2 = np.random.randint(0, cycle_size2)
+                cycle_starts1[cycle_id_1] = start1
+                cycle_starts2[cycle_id_2] = start2
+                cycle_goals1 = cycle_starts1[1:] + [cycle_starts1[0]]
+                cycle_goals2 = cycle_starts2[1:] + [cycle_starts2[0]]
+                cycle_goals1[(cycle_id_1-1)%cycle_size1] = goal1
+                cycle_goals2[(cycle_id_2-1)%cycle_size2] = goal2
+
+                self.starts = cycle_starts1 + cycle_starts2
+                self.goals = cycle_goals1 + cycle_goals2
+            case "mixed":
+                #
+                # sample a cycle size that is > 4 and < num_objects
+
+
+                cycle_starts = self.generate_random_postions(self.num_objects, clearance=clearance)
+            case _:
+                raise ValueError(f"Unknown generation type: {gen_type}")
 
         self.original_starts = self.starts.copy()
         self.init()
@@ -419,10 +470,21 @@ class Task:
         scaled_size = self.object_size * goal_scale
 
         for i, ax in enumerate(axes):
-            ax.set_xlim([-self.map_width / 2, self.map_width / 2])
-            ax.set_ylim([-self.map_length / 2, self.map_length / 2])
-            ax.set_aspect('equal')
+            table_rect = patches.FancyBboxPatch(
+                (-task.map_width / 2, -task.map_length / 2),
+                task.map_width,
+                task.map_length,
+                boxstyle="round,pad=0.02",  # Rounded corners; change to "square" if preferred
+                edgecolor='black',
+                facecolor='lightgray',  # Light gray table color
+                linewidth=2,
+                # zorder=0  # Behind everything else
+            )
+            ax.add_patch(table_rect)
+            ax.set_xlim([-task.map_width / 2, task.map_width / 2])
+            ax.set_ylim([-task.map_length / 2, task.map_length / 2])
             ax.set_title(titles[i])
+            ax.set_aspect('equal')
             ax.set_xticks([])
             ax.set_yticks([])
 
@@ -545,27 +607,27 @@ class Task:
                 start = self.get_start(i)
                 goal = self.get_goal(i)
 
-                def draw_box(xy, origin, label):
+                def draw_box(xy, origin, label, size_scale):
                     x, y = xy[0], xy[1]
-                    left = origin[0] + Inches(scale * x) - rect_size / 2
-                    top =  origin[1] - Inches(scale * y) - rect_size / 2
-                    shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, rect_size, rect_size)
+                    left = origin[0] + Inches(scale * x) - rect_size / 2 * size_scale
+                    top =  origin[1] - Inches(scale * y) - rect_size / 2 * size_scale
+                    shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, rect_size * size_scale, rect_size * size_scale)
                     fill = shape.fill
                     fill.solid()
                     fill.fore_color.rgb = RGBColor(*color)
                     shape.line.color.rgb = RGBColor(0, 0, 0)
                     shape.line.width = Pt(1)
 
-                    label_box = slide.shapes.add_textbox(left, top, rect_size, rect_size)
+                    label_box = slide.shapes.add_textbox(left, top, rect_size * size_scale, rect_size * size_scale)
                     label_box.text = str(label)
                     p = label_box.text_frame.paragraphs[0]
                     p.font.size = Pt(10)
                     p.alignment = 1  # center
 
-                if scene_type in ['start', 'overlay']:
-                    draw_box(start, (table_center_x, table_center_y), i)
                 if scene_type in ['goal', 'overlay']:
-                    draw_box(goal, (table_center_x, table_center_y), i)
+                    draw_box(goal, (table_center_x, table_center_y), i, 1.2)
+                if scene_type in ['start', 'overlay']:
+                    draw_box(start, (table_center_x, table_center_y), i, 1.0)
 
         draw_scene('start', section_margin)
         draw_scene('goal', section_margin + section_width + section_margin)
@@ -1157,60 +1219,115 @@ class Task:
             plt.close(fig)
         else:
             plt.show()
+    
+    def draw_four_panel(self, save_path=None):
+        fig, axes = plt.subplots(1, 4, figsize=(24, 6))
+        titles = ['Start Positions', 'Goal Positions', 'Start & Goal Overlay', 'Dependency Graph']
+        goal_scale = 1.2
+        scaled_size = self.object_size * goal_scale
+
+        def draw_table(ax, title):
+            table_rect = patches.FancyBboxPatch(
+                (-self.map_width / 2, -self.map_length / 2),
+                self.map_width,
+                self.map_length,
+                boxstyle="round,pad=0.02",
+                edgecolor='black',
+                facecolor='lightgray',
+                linewidth=2,
+            )
+            ax.add_patch(table_rect)
+            ax.set_xlim([-self.map_width / 2, self.map_width / 2])
+            ax.set_ylim([-self.map_length / 2, self.map_length / 2])
+            ax.set_aspect('equal')
+            ax.set_title(title)
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+        def draw_objects(ax, positions, colors, size, hatch=None, label_prefix=""):
+            for i, pos in positions.items():
+                color = colors[i]
+                lower_left = (pos[0] - size / 2, pos[1] - size / 2)
+                ax.add_patch(patches.Rectangle(
+                    lower_left, size, size,
+                    facecolor=color,
+                    edgecolor='black',
+                    hatch=hatch,
+                    alpha=1.0
+                ))
+                ax.text(pos[0], pos[1], f"{label_prefix}{i}", color='black', fontsize=10,
+                        ha='center', va='center')
+
+        for i, ax in enumerate(axes):
+            draw_table(ax, titles[i])
+
+        # Start
+        draw_objects(axes[0], self.start_dict, self.colors, self.object_size)
+
+        # Goal
+        draw_objects(axes[1], self.goal_dict, self.colors, scaled_size, hatch='/')
+
+        # Overlay
+        draw_objects(axes[2], self.goal_dict, self.colors, scaled_size, hatch='/', label_prefix='G')
+        draw_objects(axes[2], self.start_dict, self.colors, self.object_size, label_prefix='S')
+
+        # Dependency Graph
+        draw_objects(axes[3], self.start_dict, self.colors, self.object_size)
+        for dependent, interfering_set in self.dependency_graph.dependency_graph.items():
+            dest = self.start_dict[dependent]
+            for interfering in interfering_set:
+                source = self.start_dict[interfering]
+
+                dx, dy = dest[0] - source[0], dest[1] - source[1]
+                if abs(dx) > abs(dy):
+                    src_edge = (source[0] + self.object_size/2 * (1 if dx > 0 else -1), source[1])
+                    dst_edge = (dest[0] - self.object_size/2 * (1 if dx > 0 else -1), dest[1])
+                else:
+                    src_edge = (source[0], source[1] + self.object_size/2 * (1 if dy > 0 else -1))
+                    dst_edge = (dest[0], dest[1] - self.object_size/2 * (1 if dy > 0 else -1))
+
+                axes[3].annotate("",
+                    xy=dst_edge, xycoords='data',
+                    xytext=src_edge, textcoords='data',
+                    arrowprops=dict(
+                        arrowstyle="->",
+                        color='black',
+                        lw=1.5,
+                        mutation_scale=20,
+                        connectionstyle="arc3,rad=0.3"
+                    )
+                )
+
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Saved 4-panel view to: {save_path}")
+            plt.close(fig)
+        else:
+            plt.show()
 
 
-
-
-
-
-def generate_dataset(num_samples: int, folder: str = 'data'):
+def generate_dataset(num_samples: int, folder: str = 'data', object_size=0.05, clearance=0.0, gen_type="random"):
     if not os.path.exists(folder):
         os.makedirs(folder)
     
     for i in range(num_samples):
-        num_objects = random.randint(2, 10)  # Randomize the number of objects between 2 and 10
-        
         # Generate random configuration
-        task = Task(num_objects, 0.6, 0.6, 0.05)
-        task.generate(cycled=False)
-        filename = f"{folder}/task_random_{num_objects}_objects_{i}.json"
-        task.write_to_json(filename)
-        print(f"Saved: {filename}")
-        
-        # Generate cycled configuration
-        task = Task(num_objects, 0.6, 0.6, 0.05)
-        task.generate(cycled=True)
-        filename = f"{folder}/task_cycled_{num_objects}_objects_{i}.json"
+        task = Task(i, 0.6, 0.6, object_size=object_size)
+        task.generate(gen_type, clearance=clearance)
+        filename = f"{folder}/task_random_{i}_objects_{i}.json"
         task.write_to_json(filename)
         print(f"Saved: {filename}")
 
 
 # debug
 if __name__ == '__main__':
-    # make folder for the data if the folder does not exist
-    # debug the whole process
-    # if not os.path.exists('data'):
-    #     os.makedirs('data')
-    # task = Task(10, 0.6, 0.6, 0.05)
-    # task.generate()
-    # task.write_to_json('data/task.json')
-    
-    # task1 = Task.read_from_json('data/task.json')
-    # task1.draw()
-    # print(task1.get_starts())
-    # print(task1.get_goals())
-
-    # for i in range(2, 11):
-    #     task = Task(i, 0.6, 0.6, 0.05)
-    #     task.generate_fixed_cycled_objects()
-    #     task.write_to_json(f'data/task_fixed_cycled_{i}_objects.json')
-    # # Generate dataset
-    # generate_dataset(20.1, 'data')
-
     task = Task(10, 0.6, 0.6, 0.05) 
-    task.generate_running_example()
-    task.draw_triptych("results/running_example.png")
-    task.draw_dependency_graph("results/dependency_graph.png")
-    task.draw_start_goal_pair("results/start_goal_pair.png")
-    task.write_to_json("data/task_running_example.json")
-    task.draw_start_goal_dependency_to_ppt("results/test.pptx", slide_title="Running Example with Dependency Graph")
+    # task.generate_running_example()
+    task.generate("double_cycle", clearance=0.05)
+    print("task.cycles: ", task.dependency_graph.get_cycles())
+    print("task.chains: ", task.dependency_graph.get_chains())
+    print("task.independent_sets: ", task.dependency_graph.get_independent_sets())
+    task.draw_four_panel("results/four_panel.png")
+    # task.write_to_json("data/task_running_example.json")
+    # task.draw_triptych_to_ppt("results/test.pptx", slide_title="Running Example")
