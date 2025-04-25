@@ -404,6 +404,7 @@ class Task:
                 cycle_id_2 = np.random.randint(0, cycle_size2)
                 cycle_starts1[cycle_id_1] = start1
                 cycle_starts2[cycle_id_2] = start2
+                print(f"cycle_size1 = {cycle_size1}, cycle_size2 = {cycle_size2}")
                 cycle_goals1 = cycle_starts1[1:] + [cycle_starts1[0]]
                 cycle_goals2 = cycle_starts2[1:] + [cycle_starts2[0]]
                 cycle_goals1[(cycle_id_1-1)%cycle_size1] = goal1
@@ -412,11 +413,25 @@ class Task:
                 self.starts = cycle_starts1 + cycle_starts2
                 self.goals = cycle_goals1 + cycle_goals2
             case "mixed":
-                #
                 # sample a cycle size that is > 4 and < num_objects
-
-
-                cycle_starts = self.generate_random_postions(self.num_objects, clearance=clearance)
+                self.num_objects = 12
+                self.buffer_dict = {i: None for i in range(self.num_objects)}
+                print("Warning: num_objects is set to 12 for mixed generation")
+                self.colors = plt.cm.rainbow(np.linspace(0, 1, self.num_objects))
+                cycle_number = np.random.randint(2, self.num_objects - 4)
+                cycle_starts = self.generate_random_postions(cycle_number, clearance=clearance)
+                cycle_goals = cycle_starts[1:] + [cycle_starts[0]]
+                # sampel a chain size
+                chain_number = np.random.randint(2, self.num_objects - cycle_number - 1)
+                chain_starts = self.generate_random_postions(chain_number, collision_avoidance_list=cycle_starts, clearance=clearance)
+                chain_goals = self.generate_random_postions(1, collision_avoidance_list=cycle_starts+chain_starts, clearance=clearance)
+                chain_goals = chain_starts[1:] + [chain_goals[0]]
+                # sample a number of independent objects
+                independent_number = self.num_objects - cycle_number - chain_number
+                independent_starts = self.generate_random_postions(independent_number, collision_avoidance_list=cycle_starts+chain_starts, clearance=clearance)
+                independent_goals = self.generate_random_postions(independent_number, collision_avoidance_list=cycle_starts+chain_starts+independent_starts, clearance=clearance)
+                self.starts = cycle_starts + chain_starts + independent_starts
+                self.goals = cycle_goals + chain_goals + independent_goals
             case _:
                 raise ValueError(f"Unknown generation type: {gen_type}")
 
@@ -1273,6 +1288,19 @@ class Task:
 
         # Dependency Graph
         draw_objects(axes[3], self.start_dict, self.colors, self.object_size)
+
+        # Build a mapping from edge to color based on cycles
+        edge_color_map = {}
+        available_colors = ['red', 'blue', 'green', 'purple', 'orange', 'cyan']
+        for idx, cycle in enumerate(self.dependency_graph.cycles):
+            color = available_colors[idx % len(available_colors)]
+            for i in range(len(cycle)):
+                u = cycle[i]
+                v = cycle[(i + 1) % len(cycle)]  # cycle around
+                edge_color_map[(u, v)] = color
+                edge_color_map[(v, u)] = color
+
+        # Now draw arrows
         for dependent, interfering_set in self.dependency_graph.dependency_graph.items():
             dest = self.start_dict[dependent]
             for interfering in interfering_set:
@@ -1286,18 +1314,21 @@ class Task:
                     src_edge = (source[0], source[1] + self.object_size/2 * (1 if dy > 0 else -1))
                     dst_edge = (dest[0], dest[1] - self.object_size/2 * (1 if dy > 0 else -1))
 
+                # Color based on cycles
+                color = edge_color_map.get((interfering, dependent), 'black')
+
                 axes[3].annotate("",
                     xy=dst_edge, xycoords='data',
                     xytext=src_edge, textcoords='data',
                     arrowprops=dict(
                         arrowstyle="->",
-                        color='black',
+                        color=color,
                         lw=1.5,
                         mutation_scale=20,
                         connectionstyle="arc3,rad=0.3"
                     )
                 )
-
+    
         plt.tight_layout()
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -1322,7 +1353,7 @@ def generate_dataset(num_samples: int, folder: str = 'data', object_size=0.05, c
 
 # debug
 if __name__ == '__main__':
-    task = Task(10, 0.6, 0.6, 0.05) 
+    task = Task(6, 0.6, 0.6, 0.05) 
     # task.generate_running_example()
     task.generate("double_cycle", clearance=0.05)
     print("task.cycles: ", task.dependency_graph.get_cycles())

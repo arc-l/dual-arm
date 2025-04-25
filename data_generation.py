@@ -8,30 +8,26 @@ table_size = 0.6
 def generate_random():
     with open("README.md", "a") as f:
         f.write("## Random Objects\n")
-        for i in range(4, 16):
-            repeat = 1
-            if 10 <= i <= 12:
-                repeat = 2
-            for r in range(repeat):
-                task = Task(i, table_size, table_size, object_size)
+        for i in range(4, 19):
+            task = Task(i, table_size, table_size, object_size)
+            try:
+                task.generate(gen_type="random", clearance=0.2)
+            except Exception as e:
+                print("clearance 0.1 failed, trying clearance 0.1")
                 try:
-                    task.generate(gen_type="random", clearance=0.2)
+                    task.generate(gen_type="random", clearance=0.1)
                 except Exception as e:
-                    print("clearance 0.1 failed, trying clearance 0.1")
+                    print("clearance 0.1 failed, trying clearance 0.05")
                     try:
-                        task.generate(gen_type="random", clearance=0.1)
+                        task.generate(gen_type="random", clearance=0.05)
                     except Exception as e:
-                        print("clearance 0.1 failed, trying clearance 0.05")
-                        try:
-                            task.generate(gen_type="random", clearance=0.05)
-                        except Exception as e:
-                            print("clearance 0.05 failed, trying clearance 0.0")
-                            task.generate(gen_type="random", clearance=0.0)
+                        print("clearance 0.05 failed, trying clearance 0.0")
+                        task.generate(gen_type="random", clearance=0.0)
 
-                task.write_to_json(f"data/random_objects_{i}_{r}.json")
-                task.draw_four_panel(f"data_vis/random_objects_{i}_{r}.png")
-                f.write(f"### {i} objects\n")
-                f.write(f"![{i} objects](data_vis/random_objects_{i}_{r}.png)\n")
+            task.write_to_json(f"data/random_objects_{i}.json")
+            task.draw_four_panel(f"data_vis/random_objects_{i}.png")
+            f.write(f"### {i} objects\n")
+            f.write(f"![{i} objects](data_vis/random_objects_{i}.png)\n")
 
 def generate_cycled():
     with open("README.md", "a") as f:
@@ -78,6 +74,29 @@ def generate_double_cycled():
             task.draw_four_panel(f"data_vis/double_cycled_{i}.png")
             f.write(f"### {i} objects\n")
             f.write(f"![{i} objects](data_vis/double_cycled_{i}.png)\n")
+
+def generate_mixed():
+    with open("README.md", "a") as f:
+        f.write("## Mixed Objects\n")
+        for i in range(6, 13):
+            task = Task(i, table_size, table_size, object_size)
+            try:
+                task.generate(gen_type="mixed", clearance=0.2)
+            except Exception as e:
+                print("clearance 0.1 failed, trying clearance 0.1")
+                try:
+                    task.generate(gen_type="mixed", clearance=0.1)
+                except Exception as e:
+                    print("clearance 0.1 failed, trying clearance 0.05")
+                    try:
+                        task.generate(gen_type="mixed", clearance=0.05)
+                    except Exception as e:
+                        print("clearance 0.05 failed, trying clearance 0.0")
+                        task.generate(gen_type="mixed", clearance=0.0)
+            task.write_to_json(f"data/mixed{i}.json")
+            task.draw_four_panel(f"data_vis/mixed{i}.png")
+            f.write(f"### {i} objects\n")
+            f.write(f"![{i} objects](data_vis/mixed{i}.png)\n")
 
 if __name__ == "__main__":
     # clean up the readme file

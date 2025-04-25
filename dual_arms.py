@@ -1663,7 +1663,6 @@ if __name__ == '__main__':
         map_width:float = 0.6 
         map_length:float = 0.6 
         object_size:float = 0.05 
-
         task = Task(num_objects, map_width, map_length, object_size)
         # task.generate()
         task.generate_fixed_two_objects(offset=0.)
