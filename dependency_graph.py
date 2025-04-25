@@ -69,14 +69,25 @@ class DependencyGraph:
         """
         return target in self.dependency_graph.get(start, [])
 
-
     def get_independent_sets(self):
-        # get nodes that are not dependent on any other nodes
+        """
+        Nodes with no incoming edges (no dependencies) OR no outgoing edges (no one depends on them).
+        """
         independent_sets = []
-        for node in self.dependency_graph:
-            if len(self.dependency_graph[node]) == 0:
+        all_nodes = set(self.dependency_graph.keys())
+        # Collect nodes that have incoming edges
+        nodes_with_incoming = set()
+        for deps in self.dependency_graph.values():
+            nodes_with_incoming.update(deps)
+
+        for node in all_nodes:
+            has_incoming = node in nodes_with_incoming
+            has_outgoing = len(self.dependency_graph[node]) > 0
+            if not has_incoming or not has_outgoing:
                 independent_sets.append(node)
+        
         return independent_sets
+
     
     def get_cycles(self):
         return self.cycles

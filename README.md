@@ -14,6 +14,9 @@ python experiments.py --gui
 
 
 
+
+
+
 <!-- Start -->
 ## Random Objects
 ### 4 objects
@@ -80,3 +83,36 @@ python experiments.py --gui
 ![11 objects](data_vis/double_cycled_11.png)
 ### 12 objects
 ![12 objects](data_vis/double_cycled_12.png)
+## Mixed Objects
+### 0 objects
+![0 objects](data_vis/mixed_0.png)
+### 1 objects
+![1 objects](data_vis/mixed_1.png)
+### 2 objects
+![2 objects](data_vis/mixed_2.png)
+### 3 objects
+![3 objects](data_vis/mixed_3.png)
+### 4 objects
+![4 objects](data_vis/mixed_4.png)
+### 5 objects
+![5 objects](data_vis/mixed_5.png)
+### 6 objects
+![6 objects](data_vis/mixed_6.png)
+### 7 objects
+![7 objects](data_vis/mixed_7.png)
+### 8 objects
+![8 objects](data_vis/mixed_8.png)
+### 9 objects
+![9 objects](data_vis/mixed_9.png)
+### 10 objects
+![10 objects](data_vis/mixed_10.png)
+### 11 objects
+![11 objects](data_vis/mixed_11.png)
+### 12 objects
+![12 objects](data_vis/mixed_12.png)
+### 13 objects
+![13 objects](data_vis/mixed_13.png)
+### 14 objects
+![14 objects](data_vis/mixed_14.png)
+### 15 objects
+![15 objects](data_vis/mixed_15.png)

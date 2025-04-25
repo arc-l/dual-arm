@@ -1362,7 +1362,7 @@ def generate_dataset(num_samples: int, folder: str = 'data', object_size=0.05, c
 if __name__ == '__main__':
     task = Task(6, 0.6, 0.6, 0.05) 
     # task.generate_running_example()
-    task.generate("double_cycle", clearance=0.05)
+    task.generate("mixed", clearance=0.05)
     print("task.cycles: ", task.dependency_graph.get_cycles())
     print("task.chains: ", task.dependency_graph.get_chains())
     print("task.independent_sets: ", task.dependency_graph.get_independent_sets())

@@ -78,7 +78,7 @@ def generate_double_cycled():
 def generate_mixed():
     with open("README.md", "a") as f:
         f.write("## Mixed Objects\n")
-        for i in range(6, 13):
+        for i in range(16):
             task = Task(i, table_size, table_size, object_size)
             try:
                 task.generate(gen_type="mixed", clearance=0.2)
@@ -93,10 +93,10 @@ def generate_mixed():
                     except Exception as e:
                         print("clearance 0.05 failed, trying clearance 0.0")
                         task.generate(gen_type="mixed", clearance=0.0)
-            task.write_to_json(f"data/mixed{i}.json")
-            task.draw_four_panel(f"data_vis/mixed{i}.png")
+            task.write_to_json(f"data/mixed_{i}.json")
+            task.draw_four_panel(f"data_vis/mixed_{i}.png")
             f.write(f"### {i} objects\n")
-            f.write(f"![{i} objects](data_vis/mixed{i}.png)\n")
+            f.write(f"![{i} objects](data_vis/mixed_{i}.png)\n")
 
 if __name__ == "__main__":
     # clean up the readme file
@@ -123,6 +123,7 @@ if __name__ == "__main__":
     generate_random()
     generate_cycled()
     generate_double_cycled()
+    generate_mixed()
 
 
 
