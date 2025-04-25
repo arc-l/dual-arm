@@ -1292,13 +1292,20 @@ class Task:
         # Build a mapping from edge to color based on cycles
         edge_color_map = {}
         available_colors = ['red', 'blue', 'green', 'purple', 'orange', 'cyan']
+        available_colors = ['red', 'blue', 'green', 'black']
+        rad_list = [0.1, 0.3, 0.5, 0.2]
+        rad_color_dict = dict(zip(available_colors, rad_list))
         for idx, cycle in enumerate(self.dependency_graph.cycles):
             color = available_colors[idx % len(available_colors)]
             for i in range(len(cycle)):
                 u = cycle[i]
                 v = cycle[(i + 1) % len(cycle)]  # cycle around
-                edge_color_map[(u, v)] = color
-                edge_color_map[(v, u)] = color
+                if (u, v) not in edge_color_map:
+                    edge_color_map[(u, v)] = [color] 
+                    edge_color_map[(v, u)] = [color] 
+                else:
+                    edge_color_map[(u, v)].append(color)
+                    edge_color_map[(v, u)].append(color)
 
         # Now draw arrows
         for dependent, interfering_set in self.dependency_graph.dependency_graph.items():
@@ -1315,19 +1322,19 @@ class Task:
                     dst_edge = (dest[0], dest[1] - self.object_size/2 * (1 if dy > 0 else -1))
 
                 # Color based on cycles
-                color = edge_color_map.get((interfering, dependent), 'black')
-
-                axes[3].annotate("",
-                    xy=dst_edge, xycoords='data',
-                    xytext=src_edge, textcoords='data',
-                    arrowprops=dict(
-                        arrowstyle="->",
-                        color=color,
-                        lw=1.5,
-                        mutation_scale=20,
-                        connectionstyle="arc3,rad=0.3"
+                colors = edge_color_map.get((interfering, dependent), ['black'])
+                for color in colors:
+                    axes[3].annotate("",
+                        xy=dst_edge, xycoords='data',
+                        xytext=src_edge, textcoords='data',
+                        arrowprops=dict(
+                            arrowstyle="->",
+                            color=color,
+                            lw=1.5,
+                            mutation_scale=20,
+                            connectionstyle=f"arc3,rad={rad_color_dict[color]}"  # Your curve
+                        )
                     )
-                )
     
         plt.tight_layout()
         if save_path:
