@@ -721,22 +721,17 @@ class DualArmEnv:
 
         if needs_naive_plan:
             self.naive_motion_plan(task_plan)
-            print("ee_pos before before: ", self.get_current_ee_pos())
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
-            print("goal_arm1 = ", goal_arm1)
-            print("goal_arm2 = ", goal_arm2)
             if result.success:
                 cmd_plan = self.get_plan_single(result)
                 cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
                 # go down
-                print("ee_pos before: ", self.get_current_ee_pos())
                 arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
                 arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
-                print("ee_pos after: ", self.get_current_ee_pos())
                 self.add_plan_to_record(cmd_plan)
                 self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
                 self.add_plan_to_record([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
@@ -801,7 +796,6 @@ class DualArmEnv:
         new_angle1 = task_plan.arm1_angle
         new_angle2 = task_plan.arm2_angle
         ee_pos = self.get_current_ee_pos()
-        print("ee_pos in naive_motion_plan: ", ee_pos)
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
 
@@ -888,9 +882,10 @@ class DualArmEnv:
                 case -450:
                     pos2[1] = max(min(goal_arm2[1] - 0.3, self.get_current_ee_pos()[self.arm2][1]-0.3), -0.3)
 
-            cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
-            self.visualize_plan(cmd_plan)
-            self.add_plan_to_record(cmd_plan)
+            if not (new_angle1 == old_angle1 and new_angle2 == old_angle2):
+                cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
+                self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
             
             # align with the goal on the x-axis
             if new_angle1 in [450, -450]:
@@ -1026,12 +1021,11 @@ class DualArmEnv:
 
     
     def check_object_collision_enabled(self):
-        print("Single_motion_gen")
         for obj in self.objects_curobo:
             name = obj.name
             env_idx = 0
             obs_idx = self.single_motion_gen.world_coll_checker.get_obb_idx(name, env_idx)
-            print(f"{name} single_motion_gen collision enabled = ", self.single_motion_gen.world_coll_checker._cube_tensor_list[2][env_idx, obs_idx].cpu().numpy(), end=' ') 
+            # print(f"{name} single_motion_gen collision enabled = ", self.single_motion_gen.world_coll_checker._cube_tensor_list[2][env_idx, obs_idx].cpu().numpy(), end=' ') 
         print()
 
     def get_current_js(self):
@@ -1162,6 +1156,7 @@ class DualArmEnv:
                     task_plan.arm1_angle = angle1
                     task_plan.arm2_angle = angle2
                     return 
+        raise RuntimeError("No available task found")
         
 
     def find_available_task_with_buffers(self, task_plan: TaskPlan):
@@ -1484,7 +1479,7 @@ class DualArmEnv:
         self.single_motion_gen.clear_world_cache()
         self.single_motion_gen.update_world(self.world_cfg_curobo)
         self.ik_solver.update_world(self.world_cfg_curobo)
-        print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
+        # print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
     
     def save_scene_as_mesh(self):
         mesh = self.single_motion_gen.world_coll_checker.get_mesh_in_bounding_box(
@@ -1515,6 +1510,8 @@ class DualArmEnv:
         num_steps = int(torch.ceil(total_time / self.interpolation_dt))
         times = self.tensor_args.to_device(torch.linspace(0, 1, num_steps).view(-1, 1))
         interpolated_trajectories = start_joints + (end_joints - start_joints) * times
+        if interpolated_trajectories.shape[0] == 0:
+            print("interpolated_trajectories.shape[0] == 0")
         return interpolated_trajectories
         
     def move_ee(self, pos1, angle1, pos2, angle2):

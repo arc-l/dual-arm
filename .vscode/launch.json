@@ -45,7 +45,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--input",
-                "data/task_cycled_4_objects_0.json",
+                "data/random_objects_18.json",
                 "--method",
                 "ours"
             ]

@@ -816,7 +816,7 @@ class Task:
                 print("Pick two independent sets.")
                 idx_to_be_rearranged = self.dependency_graph.independent_sets
                 start_goal_pairs = list(permutations(idx_to_be_rearranged, 2))
-                random.shuffle(start_goal_pairs)
+                # random.shuffle(start_goal_pairs)
                 task_plan = TaskPlan(
                     arm1_gripper_action=GripperAction.CLOSE,
                     arm2_gripper_action=GripperAction.CLOSE,
@@ -1360,12 +1360,19 @@ def generate_dataset(num_samples: int, folder: str = 'data', object_size=0.05, c
 
 # debug
 if __name__ == '__main__':
-    task = Task(6, 0.6, 0.6, 0.05) 
-    # task.generate_running_example()
-    task.generate("mixed", clearance=0.05)
+    # task = Task(6, 0.6, 0.6, 0.05) 
+    # # task.generate_running_example()
+    # task.generate("mixed", clearance=0.05)
+    # print("task.cycles: ", task.dependency_graph.get_cycles())
+    # print("task.chains: ", task.dependency_graph.get_chains())
+    # print("task.independent_sets: ", task.dependency_graph.get_independent_sets())
+    # task.draw_four_panel("results/four_panel.png")
+    # task.write_to_json("data/task_running_example.json")
+    # task.draw_triptych_to_ppt("results/test.pptx", slide_title="Running Example")
+
+    task = Task.read_from_json("data/random_objects_18.json")
+    task.draw_four_panel("results/four_panel.png")
     print("task.cycles: ", task.dependency_graph.get_cycles())
     print("task.chains: ", task.dependency_graph.get_chains())
     print("task.independent_sets: ", task.dependency_graph.get_independent_sets())
-    task.draw_four_panel("results/four_panel.png")
-    # task.write_to_json("data/task_running_example.json")
-    # task.draw_triptych_to_ppt("results/test.pptx", slide_title="Running Example")
+
