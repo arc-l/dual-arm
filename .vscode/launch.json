@@ -60,10 +60,10 @@
             ]
         },
         {
-            "name": "dual_arm_env.py",
+            "name": "dual_arms_test.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "dual_arm_env.py",
+            "program": "dual_arms_test.py",
             "console": "integratedTerminal",
             "args": [
             ]

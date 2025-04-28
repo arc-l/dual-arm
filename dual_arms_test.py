@@ -7,9 +7,7 @@ from packaging import version
 
 import numpy as np
 import time
-import isaacsim
 from typing import List
-from omni.isaac.kit import SimulationApp
 import helper
 import torch
 def is_cuda_graph_reset_available():
@@ -55,24 +53,15 @@ from task import Task, TaskPlan, TaskState, GripperState, TaskExecutionResult, A
 class DualArmEnv:
     def __init__(self, 
                  task: Task,
-                 simulation_app: SimulationApp|None,
+                 headless: bool = False,
                  batch_size: int = 3,
                  constrain_grasp_approach: bool = False,
                  num_buffers: int = 20,
                  ):
-        self.simulation_app = simulation_app
-        # if simulation_app is None:
-        #     self.headless = True
-        # else:
-        #     self.headless = False
-        self.headless = False
+        self.headless = headless
         self.task = task
         self.num_buffers = num_buffers
         self.spheres = None
-
-        if not self.headless:
-            #TODO:
-            pass
 
         setup_curobo_logger("warn")
         self.tensor_args = TensorDeviceType()
@@ -89,8 +78,6 @@ class DualArmEnv:
         self.gripper_primary_joints_dict  = {}
         self.gripper_primary_indices_dict = {}       
         
-        self.common_js_names = []
-        self.common_js_indices = []
         self.arm_joint_names = []
         for k, v in self.gripper_mimic_joints_settings.items():
             self.gripper_mimic_joint_names.extend(v["joint_names"])
@@ -100,8 +87,7 @@ class DualArmEnv:
         self.default_config = self.robot_cfg["kinematics"]["cspace"]["retract_config"]
 
         self.objects_curobo = []
-        self.objects_isaacsim_dynamic = []
-        self.objects_isaacsim_visual = []
+        self.objects_pybullet = []
         world_cfg_table = WorldConfig.from_dict(
             load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
         )
@@ -113,9 +99,6 @@ class DualArmEnv:
         self.world_cfg_curobo = WorldConfig(cuboid=obs)
         self.max_velocity = 0.314 * 5
         self.interpolation_dt = 0.02
-
-        # ik_seed = np.random.randint(0, 10000)
-        # graph_seed = np.random.randint(0, 10000)
 
         single_motion_gen_config = MotionGenConfig.load_from_robot_config(
             self.robot_cfg,
@@ -209,26 +192,28 @@ class DualArmEnv:
         self.preferred_angles_combination = list(product(self.preferred_angles, repeat=2))
         self.all_angles = [901, 900, 450, -450, 451, -451]
         self.all_angles_combination = list(product(self.all_angles, repeat=2))
+        # the current joint states. Used for headless planning
         self.current_js = JointState.from_position(self.tensor_args.to_device([self.default_config]), self.j_names)
         self.current_js = self.current_js.get_ordered_joint_state(self.j_names_primary)
 
         # pybullet
-        self.sim_step = 0
-        self._pb = bullet_client.BulletClient(connection_mode=pybullet.GUI)
-        self._client_id = self._pb._client
-        self._pb.setAdditionalSearchPath(pybullet_data.getDataPath())
-        assets_path = os.path.dirname(os.path.abspath(""))
-        self._pb.setAdditionalSearchPath(assets_path)
-        self._pb.setAdditionalSearchPath(pybullet_data.getDataPath())
-        self._pb.setTimeStep(self.interpolation_dt)
+        if not self.headless:
+            self.sim_step = 0
+            self._pb = bullet_client.BulletClient(connection_mode=pybullet.GUI)
+            self._client_id = self._pb._client
+            self._pb.setAdditionalSearchPath(pybullet_data.getDataPath())
+            assets_path = os.path.dirname(os.path.abspath(""))
+            self._pb.setAdditionalSearchPath(assets_path)
+            self._pb.setAdditionalSearchPath(pybullet_data.getDataPath())
+            self._pb.setTimeStep(self.interpolation_dt)
 
-        # target = self._pb.getDebugVisualizerCamera()
-        self._pb.resetDebugVisualizerCamera(
-            cameraDistance=1,
-            cameraYaw=45,
-            cameraPitch=-25,
-            cameraTargetPosition=[0, -0.5, 0],
-        )
+            # target = self._pb.getDebugVisualizerCamera()
+            self._pb.resetDebugVisualizerCamera(
+                cameraDistance=1,
+                cameraYaw=45,
+                cameraPitch=-25,
+                cameraTargetPosition=[0, -0.5, 0],
+            )
 
         # end of init
         print()
@@ -246,9 +231,21 @@ class DualArmEnv:
                 color=[colors[i][0], colors[i][1], colors[i][2], 1]
             )
             self.objects_curobo.append(cube)
-
-
     
+    def add_objects_pybullet(self):
+        starts = self.task.get_starts()
+        goals = self.task.get_goals()
+        colors = self.task.get_colors()
+        goal_height = 0.001
+        goal_scale = 1.1
+        for i in range(self.task.num_objects):
+            object_shape_start = self._pb.createCollisionShape(pybullet.GEOM_BOX, halfExtents=[self.task.object_size/2, self.task.object_size/2, self.task.object_size/2])
+            object_visual_start = self._pb.createVisualShape(pybullet.GEOM_BOX, halfExtents=[self.task.object_size/2, self.task.object_size/2, self.task.object_size/2], rgbaColor=[colors[i][0], colors[i][1], colors[i][2], 1])
+            object_id_start = self._pb.createMultiBody(0.01, object_shape_start, object_visual_start, basePosition=starts[i])
+            object_visual_goal = self._pb.createVisualShape(pybullet.GEOM_BOX, halfExtents=[self.task.object_size/2 * goal_scale, self.task.object_size/2 * goal_scale, goal_height], rgbaColor=[colors[i][0], colors[i][1], colors[i][2], 0.8])
+            object_id_goal = self._pb.createMultiBody(baseMass=0, baseCollisionShapeIndex=-1, baseVisualShapeIndex=object_visual_goal, basePosition=[goals[i][0], goals[i][1], goal_height])
+            
+
     def get_ready(self, reset=False, autostart=False):
         self.reset()
 
@@ -272,35 +269,182 @@ class DualArmEnv:
         print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
 
         # pybullet
-        self._pb.resetSimulation(pybullet.RESET_USE_DEFORMABLE_WORLD)
-        self._pb.setGravity(0, 0, -9.8)
+        if not self.headless:
+            self._pb.resetSimulation(pybullet.RESET_USE_DEFORMABLE_WORLD)
+            self._pb.setGravity(0, 0, -9.8)
 
-        # Temporarily disable rendering to load URDFs faster.
-        # self._pb.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0)
+            # Add robot.
+            self._pb.loadURDF("plane.urdf", [0, 0, -0.0005])
+            self.robot_id = self._pb.loadURDF("assets/ur5e/dual_ur5e_gripper.urdf", [0, 0, 0], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL)
+            self.joint_ids_all_bullet = [self._pb.getJointInfo(self.robot_id, i)[0] for i in range(self._pb.getNumJoints(self.robot_id))]
+            # self.joint_ids_all_bullet = [j[0] for j in self.joint_ids_all_bullet if j[2] == pybullet.JOINT_REVOLUTE]
+            self.joint_ids = [self._pb.getJointInfo(self.robot_id, i)[0] for i in range(self._pb.getNumJoints(self.robot_id)) if self._pb.getJointInfo(self.robot_id, i)[2] == pybullet.JOINT_REVOLUTE]
+            self.j_names_bullet = [self._pb.getJointInfo(self.robot_id, i)[1].decode("utf-8") for i in range(self._pb.getNumJoints(self.robot_id))]
+            self.j_names_to_id = dict(zip(self.j_names_bullet, self.joint_ids_all_bullet))
+            self.j_id_to_names = dict(zip(self.joint_ids_all_bullet, self.j_names_bullet))
+            self.arm_joints_id_bullet = [self.j_names_to_id[name] for name in self.arm_joint_names]
+            self.arm_joint_names_bullet = [self.j_id_to_names[i] for i in self.arm_joints_id_bullet]
+            self.gripper_primary_indices = [self.j_names_to_id[name] for name in self.gripper_primary_joints]
+            self.gripper_primary_indices_dict[self.arm1] = self.j_names_to_id[self.gripper_primary_joints[0]]
+            self.gripper_primary_indices_dict[self.arm2] = self.j_names_to_id[self.gripper_primary_joints[1]]
+            self.gripper_mimic_joints_id_dict = {}
+            for gripper_primary_name, settings in self.gripper_mimic_joints_settings.items():
+                gripper_primary_id = self.j_names_to_id[gripper_primary_name]
+                self.gripper_mimic_joints_id_dict[gripper_primary_id] = {}
+                for i in range(len(settings["joint_names"])):
+                    mimic_joint_name = settings["joint_names"][i]
+                    multiplier = settings["multiplier"][i]
+                    mimic_joint_id = self.j_names_to_id[mimic_joint_name]
+                    self.gripper_mimic_joints_id_dict[gripper_primary_id][mimic_joint_id] = multiplier
 
-        # Add robot.
-        self._pb.loadURDF("plane.urdf", [0, 0, -0.0005])
-        self.robot_id = self._pb.loadURDF("assets/ur5e/dual_ur5e_gripper.urdf", [0, 0, 0], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL)
-        self.joint_ids = [self._pb.getJointInfo(self.robot_id, i) for i in range(self._pb.getNumJoints(self.robot_id))]
-        self.joint_ids = [j[0] for j in self.joint_ids if j[2] == pybullet.JOINT_REVOLUTE]
+            # Move robot to home configuration.
+            for i in range(len(self.joint_ids)):
+                self._pb.resetJointState(self.robot_id, self.joint_ids[i], self.default_config[i])
+            
+            # c = pybullet.createConstraint(self.robot_id, self.j_names_to_id['left_inner_knuckle_joint'], self.robot_id, self.j_names_to_id["left_inner_finger_joint"], pybullet.JOINT_POINT2POINT, [0, 0, 0], [0, -0.014, 0.043], [0, -0.034, 0.021])
+            # c = pybullet.createConstraint(self.robot_id, self.j_names_to_id['right_inner_knuckle_joint'], self.robot_id, self.j_names_to_id["right_inner_finger_joint"], pybullet.JOINT_POINT2POINT, [0, 0, 0], [0, -0.014, 0.043], [0, -0.034, 0.021])
+            # c = pybullet.createConstraint(self.robot_id, self.j_names_to_id['left_inner_knuckle_joint_1'], self.robot_id, self.j_names_to_id["left_inner_finger_joint_1"], pybullet.JOINT_POINT2POINT, [0, 0, 0], [0, -0.014, 0.043], [0, -0.034, 0.021])
+            # c = pybullet.createConstraint(self.robot_id, self.j_names_to_id['right_inner_knuckle_joint_1'], self.robot_id, self.j_names_to_id["right_inner_finger_joint_1"], pybullet.JOINT_POINT2POINT, [0, 0, 0], [0, -0.014, 0.043], [0, -0.034, 0.021])
+            # for gripper_primary_name, settings in self.gripper_mimic_joints_settings.items():
+            #     for i in range(len(settings["joint_names"])):
+            #         mimic_joint_name = settings["joint_names"][i]
+            #         multiplier = settings["multiplier"][i]
+            #         print(f"gripper_primary_name = {gripper_primary_name}, mimic_joint_name = {mimic_joint_name}, multiplier = {multiplier}")
+            #         constraint_id = self._pb.createConstraint(
+            #             parentBodyUniqueId=self.robot_id,
+            #             parentLinkIndex=self.j_names_to_id[gripper_primary_name],
+            #             childBodyUniqueId=self.robot_id,
+            #             childLinkIndex=self.j_names_to_id[mimic_joint_name],
+            #             jointType=pybullet.JOINT_GEAR,
+            #             jointAxis=[0, 1, 0],
+            #             parentFramePosition=[0, 0, 0],
+            #             childFramePosition=[0, 0, 0]
+            #         )
+            #         self._pb.setJointMotorControl2(
+            #             bodyUniqueId=self.robot_id,
+            #             jointIndex=self.j_names_to_id[mimic_joint_name],
+            #             controlMode=pybullet.VELOCITY_CONTROL,
+            #             targetVelocity=0,
+            #             force=0
+            #         )
+            #         self._pb.changeConstraint(
+            #             constraint_id,
+            #             gearRatio=multiplier,
+            #             maxForce=10000,
+            #             erp=0.2
+            #         )
 
-        # Move robot to home configuration.
-        for i in range(len(self.joint_ids)):
-            self._pb.resetJointState(self.robot_id, self.joint_ids[i], self.default_config[i])
+            # Add workspace.
+            plane_shape = self._pb.createCollisionShape(
+                pybullet.GEOM_BOX, halfExtents=[0.3, 0.3, 0.001])
+            plane_visual = self._pb.createVisualShape(
+                pybullet.GEOM_BOX, halfExtents=[0.3, 0.3, 0.001])
+            plane_id = self._pb.createMultiBody(
+                0, plane_shape, plane_visual, basePosition=[0, 0, 0])
+            self._pb.changeVisualShape(
+                plane_id, -1, rgbaColor=[0.2, 0.2, 0.2, 1.0])
 
-        # Add workspace.
-        plane_shape = self._pb.createCollisionShape(
-            pybullet.GEOM_BOX, halfExtents=[0.3, 0.3, 0.001])
-        plane_visual = self._pb.createVisualShape(
-            pybullet.GEOM_BOX, halfExtents=[0.3, 0.3, 0.001])
-        plane_id = self._pb.createMultiBody(
-            0, plane_shape, plane_visual, basePosition=[0, 0, 0])
-        self._pb.changeVisualShape(
-            plane_id, -1, rgbaColor=[0.2, 0.2, 0.2, 1.0])
+            # Add objects. You have to add the objects later than the robot and the workspace, or it can be moved by the robot arm acciedentally.
+            self.add_objects_pybullet()
 
-        for _ in range(10000):
-            self._pb.stepSimulation()
+            for _ in range(200):
+                self._pb.stepSimulation()
+            print("reset finished")
+    
+    def step(self):
+        if self.headless:
+            return
+        self.gripper_update()
+        self._pb.stepSimulation()
+        time.sleep(self.interpolation_dt)
 
+    def gripper_update(self):
+        target_joint_states = []
+        target_joint_ids = []
+        for gripper_primary_id, gripper_mimic_joints in self.gripper_mimic_joints_id_dict.items(): 
+            curr_joint_state = self._pb.getJointState(self.robot_id, gripper_primary_id)
+            for mimic_joint_id, multiplier in gripper_mimic_joints.items():
+                target_joint_ids.append(mimic_joint_id)
+                target_joint_states.append(curr_joint_state[0] * multiplier)
+        self._pb.setJointMotorControlArray(
+            self.robot_id,
+            target_joint_ids,
+            pybullet.POSITION_CONTROL,
+            targetPositions=target_joint_states,
+            positionGains=[1] * len(target_joint_ids),
+        )
+        
+    def gripper_control(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
+        self.gripper_closed[self.arm1] = bool(gripper1_action.value)
+        self.gripper_closed[self.arm2] = bool(gripper2_action.value)
+        if self.headless:
+            return
+
+        target_velocities = [
+            1 if gripper1_action==GripperAction.CLOSE else -1,
+            1 if gripper2_action==GripperAction.CLOSE else -1
+        ]
+        target_positions = [
+            0.8 if gripper1_action==GripperAction.CLOSE else 0.0,
+            0.8 if gripper2_action==GripperAction.CLOSE else 0.0
+        ]
+        self._pb.setJointMotorControlArray(
+            self.robot_id,
+            self.gripper_primary_indices,
+            pybullet.VELOCITY_CONTROL,
+            # targetPositions=target_positions,
+            targetVelocities=target_velocities,
+            forces=[10, 10],
+            # positionGains=[0.1, 0.1],
+        )
+        old_positions = self._pb.getJointStates(self.robot_id, self.gripper_primary_indices)
+        while True:
+            self.step()
+            new_positions = self._pb.getJointStates(self.robot_id, self.gripper_primary_indices)
+            if all(np.linalg.norm(new_positions[i][0] - old_positions[i][0]) < 0.01 for i in range(len(old_positions))):
+                break
+            old_positions = new_positions
+    
+    def test_gripper_control(self):
+        self.get_ready()
+        for i in range(3):
+            self.gripper_control(GripperAction.CLOSE, GripperAction.CLOSE)
+            self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
+        
+        print("Gripper test 0 finished")
+        time.sleep(2)
+        
+        for i in range(3):
+            self.gripper_control(GripperAction.CLOSE, GripperAction.OPEN)
+            self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
+        
+        print("Gripper test 1 finished")
+        time.sleep(2)
+        
+        for i in range(3):
+            self.gripper_control(GripperAction.OPEN, GripperAction.CLOSE)
+            self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
+
+        print("Gripper test 2 finished")
+        time.sleep(2)
+        
+        for i in range(3):
+            self.gripper_control(GripperAction.CLOSE, GripperAction.CLOSE)
+            self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
+
+        print("Gripper test 3 finished")
+        time.sleep(2)
+        
+        for i in range(3):
+            self.gripper_control(GripperAction.CLOSE, GripperAction.OPEN)
+            self.gripper_control(GripperAction.OPEN, GripperAction.CLOSE)
+
+        print("Gripper test 4 finished")
+        time.sleep(2)
+        
+        self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
+
+        
     
     @staticmethod
     def get_pose_grid(n_x, n_y, n_z, max_x, max_y, max_z):
@@ -355,15 +499,6 @@ class DualArmEnv:
             ik_goal1.position += position_offsets
         return ik_goal1, ik_goal2
 
-    def test_ik_solve_batch(self):
-        self.get_ready()
-        cube = self.objects_isaacsim_dynamic[0]
-        c_p1, _ = cube.get_world_pose()
-        cube = self.objects_isaacsim_dynamic[1]
-        c_p2, _ = cube.get_world_pose()
-        ik_goal1, ik_goal2 = self.get_grid_goal_poses(c_p1, c_p2, 900, 900)
-        ik_results = self.ik_solve_batch(ik_goal1, ik_goal2)
-        
     def ik_solve_single(self, c_p1:np.ndarray, c_p2:np.ndarray|None, arm_angle1=900, arm_angle2:float|None=900, num_solutions=1):
         c_rot = self.gripper_grasp_orientations[self.arm1][arm_angle1]
         ik_goal = Pose(
@@ -1042,47 +1177,6 @@ class DualArmEnv:
         if self.visualize_spheres:
             self.visualize_robot_spheres()
 
-    def add_opacity_material(
-        self,
-        material_name: str,
-        object_path: str,
-        color: List[float],
-        obj_prim, #Usd.Prim
-        material: Material = Material(),
-    ):
-        mat_path = join_path(object_path, material_name)
-        material_usd = UsdShade.Material.Define(self.stage, mat_path)
-        pbrShader = UsdShade.Shader.Define(self.stage, join_path(mat_path, "PbrShader"))
-        pbrShader.CreateIdAttr("UsdPreviewSurface")
-        pbrShader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(material.roughness)
-        pbrShader.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(material.metallic)
-        pbrShader.CreateInput("specularColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(color[:3]))
-        pbrShader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(color[:3]))
-        pbrShader.CreateInput("baseColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(color[:3]))
-        # somehow we need this emissiveColor here
-        pbrShader.CreateInput("emissiveColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(color[:3]))
-
-        pbrShader.CreateInput("opacity", Sdf.ValueTypeNames.Float).Set(color[3])
-        material_usd.CreateSurfaceOutput().ConnectToSource(pbrShader.ConnectableAPI(), "surface")
-        obj_prim.GetPrim().ApplyAPI(UsdShade.MaterialBindingAPI)
-        UsdShade.MaterialBindingAPI(obj_prim).Bind(material_usd)
-        return material_usd
-    
-    def add_physics_material(
-        self,
-        material_name: str,
-        object_path: str,
-        dynamic_friction: float,
-        static_friction: float,
-        restitution: float,
-        obj_prim, #Usd.Prim
-    ):
-        mat_path = join_path(object_path, material_name)
-        material_api = UsdPhysics.MaterialAPI.Apply(obj_prim.GetPrim())
-        material_api.CreateDynamicFrictionAttr(dynamic_friction)
-        material_api.CreateStaticFrictionAttr(static_friction)
-        material_api.CreateRestitutionAttr(restitution)
-
     def test_different_grasp_angles(self):
         self.get_ready()
         angles = [900, 450, -450, 901, 451, -451]
@@ -1193,6 +1287,15 @@ class DualArmEnv:
         if interpolated_trajectories.shape[0] == 0:
             print("interpolated_trajectories.shape[0] == 0")
         return interpolated_trajectories
+    
+    def servoj(self, joints):
+        """Move to target joint positions with position control."""
+        self._pb.setJointMotorControlArray(
+        bodyIndex=self.robot_id,
+        jointIndices=self.joint_ids,
+        controlMode=pybullet.POSITION_CONTROL,
+        targetPositions=joints,
+        positionGains=[0.01]*6)
         
     def move_ee(self, pos1, angle1, pos2, angle2):
         ik_result = self.ik_solve_single(pos1, pos2, angle1, angle2, num_solutions=1)
@@ -1332,33 +1435,18 @@ if __name__ == '__main__':
         task.generate_fixed_two_objects(offset=0.)
     if test_plan_all:
         task = Task.read_from_json("data/random_objects_4.json")
-    # task.generate_chained_two_objects()
-    # task.generate_fixed_cycled_objects()
-    # task.generate_fixed_two_objects_to_test_grasp_orientation()
-    # task.generate_fixed_two_to_test_batch_planner()
-    # task.generate_fixed_four_objects()
-    # task.generate_chained_four_objects()
-    # task.generate_fixed_six_objects()
-    # task = Task.read_from_json("data/task_random_9_objects_17.json")
+
     dual_arm = DualArmEnv(task,
-                          None,
+                          False,
                           batch_size = 3,
                           constrain_grasp_approach=False,
                           )
-    dual_arm.reset()
-    # dual_arm.test_ik_solve_batch()
-    # dual_arm.test_plan_batch()
-    # dual_arm.display()
-    time.sleep(100)
+    # dual_arm.reset()
+    dual_arm.test_gripper_control()
     exit(0)
     if test_grasp_angles:
         dual_arm.test_different_grasp_angles()
     if test_plan_all:
         task_plans = dual_arm.plan_all()
         print(task_plans)
-    # dual_arm.test_gripper_control()
-    # dual_arm.test_grasp()
-    # dual_arm.test_move_ee()
-    # plan = dual_arm.plan()
-    # dual_arm.play(plan)
     

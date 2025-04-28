@@ -39,7 +39,7 @@ class GripperState(Enum):
             return GripperAction.OPEN
 
 class GripperAction(Enum):
-    OPEN = 0
+    OPEN = 0 
     CLOSE = 1
     def reverse(self):
         if self == GripperAction.OPEN:
