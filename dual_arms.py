@@ -50,8 +50,6 @@ def is_cuda_graph_reset_available():
 assert is_cuda_graph_reset_available() == True
 
 # CuRobo
-from curobo.cuda_robot_model.cuda_robot_model import CudaRobotModel
-
 from curobo.geom.sdf.world import CollisionCheckerType
 from curobo.geom.types import WorldConfig, Cuboid, Material
 from curobo.rollout.rollout_base import Goal

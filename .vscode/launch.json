@@ -58,6 +58,15 @@
             "console": "integratedTerminal",
             "args": [
             ]
+        },
+        {
+            "name": "dual_arm_env.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "dual_arm_env.py",
+            "console": "integratedTerminal",
+            "args": [
+            ]
         }
     ]
 }
