@@ -8,16 +8,8 @@ import torch
 import numpy as np
 import time
 import isaacsim
-from typing import List
-from omni.isaac.kit import SimulationApp
-if __name__ == '__main__':
-    simulation_app = SimulationApp({
-                    "headless": False,
-                    "width": "1920",
-                    "height": "1080",
-    })
 from dual_arms import DualArmEnv
-# from isaacsim import SimulationApp
+from isaacsim import SimulationApp
 from baseline.motion_planning.simulation import simulation
 from baseline.high_level_planners.Bi_Directional_Search_Tree_Planner import Bi_Directional_Search_Tree_Planner
 from baseline.experiments import plan2schedule

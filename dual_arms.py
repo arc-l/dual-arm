@@ -1438,7 +1438,6 @@ class DualArmEnv:
         return positions#, rotations
 
     def sync_isaacsim_curobo(self, idx_to_sync: list = None):
-        #TODO: provide functionality for headless mode
         if idx_to_sync is None:
             idx_to_sync = list(range(self.task.num_objects))
         new_starts = {}

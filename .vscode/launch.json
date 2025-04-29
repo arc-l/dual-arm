@@ -30,7 +30,8 @@
             "args": [
                 "--input",
                 // "data/task_2_cycle.json",
-                "data/random_objects_18.json",
+                // "data/random_objects_18.json",
+                "data/random_objects_4.json",
                 // "data/task_running_example.json",
                 // "data/task_fixed_cycled_4_objects.json",
                 "--method",
@@ -45,7 +46,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--input",
-                "data/random_objects_18.json",
+                "data/random_objects_4.json",
                 "--method",
                 "ours"
             ]
