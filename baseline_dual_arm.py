@@ -7,9 +7,7 @@ import torch
 
 import numpy as np
 import time
-import isaacsim
 from dual_arms import DualArmEnv
-from isaacsim import SimulationApp
 from baseline.motion_planning.simulation import simulation
 from baseline.high_level_planners.Bi_Directional_Search_Tree_Planner import Bi_Directional_Search_Tree_Planner
 from baseline.experiments import plan2schedule
@@ -17,8 +15,8 @@ from baseline.motion_planning.robot_arm import ControlMode
 from task import Task, GripperAction
 
 class Baseline(DualArmEnv):
-    def __init__(self, task: Task, simulation_app: SimulationApp):
-        super().__init__(task, simulation_app, batch_size = 3, constrain_grasp_approach=False, visualize_spheres=False)
+    def __init__(self, task: Task):
+        super().__init__(task, headless=True, batch_size = 3, constrain_grasp_approach=False, visualize_spheres=False)
     
     @staticmethod
     def convert_to_task_planner_space(pos):
@@ -191,8 +189,6 @@ if __name__ == '__main__':
     # task.generate_fixed_four_objects()
     # task.generate_chained_four_objects()
     # task.generate_fixed_six_objects()
-    dual_arm = Baseline(task,
-                        simulation_app,
-                        )
+    dual_arm = Baseline(task)
     recorded_plan = dual_arm.plan()
     dual_arm.play(recorded_plan=recorded_plan)

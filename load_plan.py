@@ -1,5 +1,5 @@
 import isaacsim
-from dual_arms_test import DualArmEnv
+from dual_arms import DualArmEnv
 from baseline_dual_arm import Baseline
 import argparse, os
 from curobo.types.state import JointState
@@ -57,5 +57,6 @@ if __name__ == "__main__":
     plan_path = args.input.replace('.json', f'_{args.method}_plan.pkl').replace('data', 'results')
 
     plan = load_plan(plan_path, device='cuda:0')
+    # input("Press Enter to continue...")
     planner.play(plan)
 
