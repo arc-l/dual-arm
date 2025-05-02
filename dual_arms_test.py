@@ -276,7 +276,8 @@ class DualArmEnv:
             # Add robot.
             self._pb.loadURDF("plane.urdf", [0, 0, -0.0005])
             self.robot_id = self._pb.loadURDF("assets/ur5e/dual_ur5e_gripper.urdf", [0, 0, 0], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL)
-            self.joint_ids_all_bullet = [self._pb.getJointInfo(self.robot_id, i)[0] for i in range(self._pb.getNumJoints(self.robot_id))]
+            self.all_joint_info = [self._pb.getJointInfo(self.robot_id, i) for i in range(self._pb.getNumJoints(self.robot_id))]
+            self.joint_ids_all_bullet = [info[0] for info in self.all_joint_info]
             # self.joint_ids_all_bullet = [j[0] for j in self.joint_ids_all_bullet if j[2] == pybullet.JOINT_REVOLUTE]
             self.joint_ids = [self._pb.getJointInfo(self.robot_id, i)[0] for i in range(self._pb.getNumJoints(self.robot_id)) if self._pb.getJointInfo(self.robot_id, i)[2] == pybullet.JOINT_REVOLUTE]
             self.j_names_bullet = [self._pb.getJointInfo(self.robot_id, i)[1].decode("utf-8") for i in range(self._pb.getNumJoints(self.robot_id))]
@@ -287,6 +288,21 @@ class DualArmEnv:
             self.gripper_primary_indices = [self.j_names_to_id[name] for name in self.gripper_primary_joints]
             self.gripper_primary_indices_dict[self.arm1] = self.j_names_to_id[self.gripper_primary_joints[0]]
             self.gripper_primary_indices_dict[self.arm2] = self.j_names_to_id[self.gripper_primary_joints[1]]
+            self.gripper_pads_id_bullet = {self.arm1: [], self.arm2: []}
+            self.ee_name_to_id = {self.arm1: None, self.arm2: None}
+            for i in range(self._pb.getNumJoints(self.robot_id)):
+                joint_info = self.all_joint_info[i]
+                link_name = joint_info[12].decode("utf-8")
+                if "finger_pad" in link_name:
+                    if "_1" in link_name:
+                        self.gripper_pads_id_bullet[self.arm2].append(i)
+                    else:
+                        self.gripper_pads_id_bullet[self.arm1].append(i)
+                
+                if link_name == self.arm1:
+                    self.ee_name_to_id[self.arm1] = i
+                if link_name == self.arm2:
+                    self.ee_name_to_id[self.arm2] = i
             self.gripper_mimic_joints_id_dict = {}
             for gripper_primary_name, settings in self.gripper_mimic_joints_settings.items():
                 gripper_primary_id = self.j_names_to_id[gripper_primary_name]
@@ -357,7 +373,7 @@ class DualArmEnv:
     def step(self, cnt=1, sleep=True):
         if self.headless:
             return
-        # self.gripper_update()
+        self.gripper_update()
         for i in range(cnt):
             self._pb.stepSimulation()
         if sleep:
@@ -379,10 +395,10 @@ class DualArmEnv:
             positionGains=[1] * len(target_joint_ids),
         )
     
-    def grasp_width(self):
-        lpad = np.array(self._pb.getLinkState(self.body, 4)[0])
-        rpad = np.array(self._pb.getLinkState(self.body, 9)[0])
-        dist = np.linalg.norm(lpad - rpad) - 0.047813
+    def grasp_width(self, arm):
+        pad1 = np.array(self._pb.getLinkState(self.robot_id, self.gripper_pads_id_bullet[arm][0])[0])
+        pad2 = np.array(self._pb.getLinkState(self.robot_id, self.gripper_pads_id_bullet[arm][1])[0])
+        dist = np.linalg.norm(pad1 - pad2) - 0.14 
         return dist 
         
     def gripper_control(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
@@ -392,8 +408,8 @@ class DualArmEnv:
             return
 
         target_velocities = [
-            1 if gripper1_action==GripperAction.CLOSE else -1,
-            1 if gripper2_action==GripperAction.CLOSE else -1
+            0.5 if gripper1_action==GripperAction.CLOSE else -0.5,
+            0.5 if gripper2_action==GripperAction.CLOSE else -0.5
         ]
         target_positions = [
             0.8 if gripper1_action==GripperAction.CLOSE else 0.0,
@@ -405,30 +421,98 @@ class DualArmEnv:
             pybullet.VELOCITY_CONTROL,
             # targetPositions=target_positions,
             targetVelocities=target_velocities,
-            forces=[0.5, 0.5],
+            forces=[10, 10],
         )
-        for i in range(240):
+
+        old_positions = self._pb.getJointStates(self.robot_id, self.gripper_primary_indices)
+        while True:
+            # for _ in range(240):
+            #     self.gripper_update()
+            #     self.step(1, sleep=False)
             self.gripper_update()
-            self.step(1, sleep=i%10==0)
-        # old_positions = self._pb.getJointStates(self.robot_id, self.gripper_primary_indices)
-        # while True:
-        #     for _ in range(240):
-        #         self.gripper_update()
-        #         self.step(1, sleep=False)
-        #     self.step(1, sleep=True)
-        #     new_positions = self._pb.getJointStates(self.robot_id, self.gripper_primary_indices)
-        #     if all(np.linalg.norm(new_positions[i][0] - old_positions[i][0]) < 0.01 for i in range(len(old_positions))):
-        #         self._pb.setJointMotorControlArray(
-        #             self.robot_id,
-        #             self.gripper_primary_indices,
-        #             pybullet.VELOCITY_CONTROL,
-        #             # targetPositions=target_positions,
-        #             targetVelocities=[v * 0.1 for v in target_velocities],
-        #             forces=[2, 2],
-        #             # positionGains=[0.1, 0.1],
-        #         )
-        #         break
-        #     old_positions = new_positions
+            self.step(1, sleep=True)
+            new_positions = self._pb.getJointStates(self.robot_id, self.gripper_primary_indices)
+            # we only care about closed ones
+            if gripper1_action == GripperAction.CLOSE:
+                if self.grasp_width(self.arm1) <= 1.1 * self.task.object_size:
+                    obj = self.check_contact(self.arm1)
+                    if obj is not None:
+                        target_velocities[0] = 0
+                        # create fixed constraint
+                        pos, orn = self._pb.getLinkState(self.robot_id, self.ee_name_to_id[self.arm1])[:2]
+                        obj_pos, obj_orn = self._pb.getBasePositionAndOrientation(obj)
+                        parent_frame_pos, parent_frame_orn = self._pb.multiplyTransforms(
+                            *self._pb.invertTransform(pos, orn),
+                            obj_pos, obj_orn
+                        )
+                        self._pb.createConstraint(
+                            parentBodyUniqueId=self.robot_id,
+                            parentLinkIndex=self.ee_name_to_id[self.arm1],
+                            childBodyUniqueId=obj,
+                            childLinkIndex=-1,
+                            jointType=pybullet.JOINT_FIXED,
+                            jointAxis=[0, 0, 0],
+                            parentFramePosition=parent_frame_pos,
+                            parentFrameOrientation=parent_frame_orn,
+                            childFramePosition=[0, 0, 0],
+                            childFrameOrientation=[0, 0, 0],
+                        )
+                        print("Constraint created for arm1")
+            if gripper2_action == GripperAction.CLOSE:
+                if self.grasp_width(self.arm2) <= 1.1 * self.task.object_size:
+                    obj = self.check_contact(self.arm2)
+                    if obj is not None:
+                        target_velocities[1] = 0
+                        # create fixed constraint
+                        pos, orn = self._pb.getLinkState(self.robot_id, self.ee_name_to_id[self.arm2])[:2]
+                        obj_pos, obj_orn = self._pb.getBasePositionAndOrientation(obj)
+                        parent_frame_pos, parent_frame_orn = self._pb.multiplyTransforms(
+                            *self._pb.invertTransform(pos, orn),
+                            obj_pos, obj_orn
+                        )
+                        self._pb.createConstraint(
+                            parentBodyUniqueId=self.robot_id,
+                            parentLinkIndex=self.ee_name_to_id[self.arm2],
+                            childBodyUniqueId=obj,
+                            childLinkIndex=-1,
+                            jointType=pybullet.JOINT_FIXED,
+                            jointAxis=[0, 0, 0],
+                            parentFramePosition=parent_frame_pos,
+                            parentFrameOrientation=parent_frame_orn,
+                            childFramePosition=[0, 0, 0],
+                            childFrameOrientation=[0, 0, 0],
+                        )
+                        print("Constraint created for arm2")
+
+
+            self._pb.setJointMotorControlArray(
+                self.robot_id,
+                self.gripper_primary_indices,
+                pybullet.VELOCITY_CONTROL,
+                targetVelocities=target_velocities,
+                forces=[10, 10],
+            )
+            if all(np.linalg.norm(new_positions[i][0] - old_positions[i][0]) < 0.001 for i in range(len(old_positions))):
+                break
+            old_positions = new_positions
+    
+    def check_contact(self, arm):
+        contact_points = self._pb.getContactPoints(bodyA=self.robot_id)
+        for contact in contact_points:
+            link_index = contact[3]  # Link index on robot
+            other_body_id = contact[2]  # ID of the other body
+            if link_index in self.gripper_pads_id_bullet[arm] and other_body_id != self.robot_id:
+                return other_body_id 
+        return None
+    
+    def check_proximity(self, arm):
+        ee_pos = np.array(self._pb.getLinkState(self.robot_id, self.ee_name_to_id[arm])[0])
+        tool_pos = np.array(self._pb.getLinkState(self.robot_id, self.gripper_pads_id_bullet[arm][0])[0])
+        vec = (tool_pos - ee_pos) / np.linalg.norm((tool_pos - ee_pos))
+        ee_targ = ee_pos + vec
+        ray_data = self._pb.rayTest(ee_pos, ee_targ)[0]
+        obj, link, ray_frac = ray_data[0], ray_data[1], ray_data[2]
+        return obj, link, ray_frac
     
     def test_gripper_control(self):
         self.get_ready()
@@ -972,7 +1056,7 @@ class DualArmEnv:
             cu_js = cmd_state.get_ordered_joint_state(self.arm_joint_names)
             position = cu_js.position.view(-1).cpu().numpy()
             self.servoj(position)
-            self.step(240)
+            self.step(240, sleep=True)
             cmd_idx += 1
 
 
