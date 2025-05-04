@@ -38,6 +38,9 @@ class DependencyGraph:
     def has_chains(self):
         return len(self.chains) > 0
     
+    def depends_on(self, index):
+        return self.dependency_graph.get(index, set())
+    
     def is_dependent(self, start, target):
         """
         Checks if the target node is dependent on the start node in the dependency graph.

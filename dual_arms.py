@@ -408,15 +408,18 @@ class DualArmEnv:
         return dist 
         
     def gripper_control(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
-        self.gripper_closed[self.arm1] = bool(gripper1_action.value)
-        self.gripper_closed[self.arm2] = bool(gripper2_action.value)
-        if self.headless:
-            return
-
         target_velocities = [
             self.max_velocity if gripper1_action==GripperAction.CLOSE else -self.max_velocity,
             self.max_velocity if gripper2_action==GripperAction.CLOSE else -self.max_velocity
         ]
+        if self.gripper_closed[self.arm1] == bool(gripper1_action.value):
+            target_velocities[0] = 0
+        if self.gripper_closed[self.arm2] == bool(gripper2_action.value):
+            target_velocities[1] = 0
+        self.gripper_closed[self.arm1] = bool(gripper1_action.value)
+        self.gripper_closed[self.arm2] = bool(gripper2_action.value)
+        if self.headless:
+            return
 
         self._pb.setJointMotorControlArray(
             self.robot_id,
@@ -768,6 +771,7 @@ class DualArmEnv:
                 self.add_plan_to_record(cmd_plan)
             else:
                 # one arm by one arm
+                #TODO: Check the order of the arms. If arm1's goal is dependent on arm2's goal, then we can't move arm1 first and vice versa.
                 tmp_goal_arm1 = self.default_ee_pos[self.arm1]
                 tmp_goal_arm2 = self.default_ee_pos[self.arm2]
                 # move arm2 to goal, arm1 to retract pose
@@ -915,8 +919,12 @@ class DualArmEnv:
             # align with the goal on the x-axis
             if new_angle1 in [450, -450]:
                 pos1[0] = goal_arm1[0]
+            else:
+                pos1[1] = goal_arm1[1]
             if new_angle2 in [450, -450]:
                 pos2[0] = goal_arm2[0]
+            else:
+                pos2[1] = goal_arm2[1]
             
             cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
             self.visualize_plan(cmd_plan)
@@ -1179,6 +1187,7 @@ class DualArmEnv:
         for combo in self.preferred_angles_combination:
             for indices in task_plan.start_goal_pairs:
                 goal1_dependent_on_goal2 = self.task.is_direct_dependent(indices[0], indices[1])
+                goal2_dependent_on_goal1 = self.task.is_direct_dependent(indices[1], indices[0])
                 start1, goal1, start2, goal2 = self.task.get_start( indices[0] ), self.task.get_goal( indices[0] ), self.task.get_start( indices[1] ), self.task.get_goal( indices[1] )
                 angle1, angle2 = combo
                 start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
@@ -1194,12 +1203,22 @@ class DualArmEnv:
                     quaternion=self.tensor_args.to_device(self.gripper_grasp_orientations[self.arm1][angle1])
                 )
                 ik_goal1 = ik_goal1.repeat(buffers.shape[0])
-                if goal1_dependent_on_goal2:
-                    ik_goal1.position += self.tensor_args.to_device(goal1)
-                    ik_goal2.position += self.tensor_args.to_device(buffers) 
+                if goal1_dependent_on_goal2 and goal2_dependent_on_goal1:
+                    if len(self.task.depends_on(indices[0])) > 1 and len(self.task.depends_on(indices[1])) == 1:
+                        ik_goal1.position += self.tensor_args.to_device(buffers)
+                        ik_goal2.position += self.tensor_args.to_device(goal2)
+                    elif len(self.task.depends_on(indices[1])) > 1 and len(self.task.depends_on(indices[0])) == 1:
+                        ik_goal1.position += self.tensor_args.to_device(goal1)
+                        ik_goal2.position += self.tensor_args.to_device(buffers) 
+                    else:
+                        raise RuntimeError("Both goals has multiple dependencies")
                 else:
-                    ik_goal1.position += self.tensor_args.to_device(buffers)
-                    ik_goal2.position += self.tensor_args.to_device(goal2)
+                    if goal1_dependent_on_goal2:
+                        ik_goal1.position += self.tensor_args.to_device(goal1)
+                        ik_goal2.position += self.tensor_args.to_device(buffers) 
+                    else:
+                        ik_goal1.position += self.tensor_args.to_device(buffers)
+                        ik_goal2.position += self.tensor_args.to_device(goal2)
                 goal_ik_results = self.ik_solve_batch(ik_goal1, ik_goal2)
                 success_indices = torch.where(goal_ik_results.success)[0]
                 if len(success_indices) == 0:
@@ -1217,12 +1236,19 @@ class DualArmEnv:
                         max_min_dist = min_dist
                         furthest_buffer = buffer
 
-                idx = random.choice(success_indices)
                 task_plan.buffer = {1: None, 2: None}
-                if goal1_dependent_on_goal2:
-                    task_plan.buffer[2] = furthest_buffer
+                if goal1_dependent_on_goal2 and goal2_dependent_on_goal1:
+                    if len(self.task.depends_on(indices[0])) > 1 and len(self.task.depends_on(indices[1])) == 1:
+                        task_plan.buffer[1] = furthest_buffer
+                    elif len(self.task.depends_on(indices[1])) > 1 and len(self.task.depends_on(indices[0])) == 1:
+                        task_plan.buffer[2] = furthest_buffer
+                    else:
+                        raise RuntimeError("Both goals has multiple dependencies")
                 else:
-                    task_plan.buffer[1] = furthest_buffer
+                    if goal1_dependent_on_goal2:
+                        task_plan.buffer[2] = furthest_buffer
+                    else:
+                        task_plan.buffer[1] = furthest_buffer
                 task_plan.arm1_assigned_object = indices[0]
                 task_plan.arm2_assigned_object = indices[1]
                 task_plan.arm1_angle = angle1

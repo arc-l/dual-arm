@@ -806,28 +806,16 @@ class Task:
     
     def finished(self):
         return len(self.idx_to_be_rearranged) == 0
+    
+    def depends_on(self, index):
+        # check if the index is in the dependency graph
+        if index in self.dependency_graph.dependency_graph:
+            return self.dependency_graph.depends_on(index)
+        return {}
+    
 
     def plan(self):
-        # self.draw_dependency_graph("dependency_graph.png")
-        # self.draw_triptych("result.png")
         if self.all_arms_available():
-            if len(self.dependency_graph.independent_sets) > 1:
-                # pick two independent sets
-                print("Pick two independent sets.")
-                idx_to_be_rearranged = self.dependency_graph.independent_sets
-                start_goal_pairs = list(permutations(idx_to_be_rearranged, 2))
-                # random.shuffle(start_goal_pairs)
-                task_plan = TaskPlan(
-                    arm1_gripper_action=GripperAction.CLOSE,
-                    arm2_gripper_action=GripperAction.CLOSE,
-                    start_goal_pairs=start_goal_pairs,
-                    arm1_to_start=True,
-                    arm2_to_start=True,
-                    arm1_assigned_object=None,
-                    arm2_assigned_object=None
-                    )
-                return task_plan
-            
             if len(self.idx_to_be_rearranged) == 1:
                 # last one to finish
                 print("Last one to finish.")
@@ -842,6 +830,14 @@ class Task:
                     arm1_angle=900
                 )
                 return task_plan
+
+            start_goal_pairs = []
+            if len(self.dependency_graph.independent_sets) > 1:
+                # pick two independent sets
+                print("Pick two independent sets.")
+                idx_to_be_rearranged = self.dependency_graph.independent_sets
+                start_goal_pairs += list(permutations(idx_to_be_rearranged, 2))
+                # random.shuffle(start_goal_pairs)
                 
             if self.dependency_graph.has_chains():
                 # pick one chain
@@ -849,57 +845,69 @@ class Task:
                 chain = self.dependency_graph.get_chains()[0]
                 print("chain: ", chain)
                 assert len(chain) > 1, "Chain has to have more than one object"
-                start_goal_pairs = [(chain[-1], chain[-2]), (chain[-2], chain[-1])]
-                task_plan = TaskPlan(
-                    arm1_gripper_action=GripperAction.CLOSE,
-                    arm2_gripper_action=GripperAction.CLOSE,
-                    start_goal_pairs=start_goal_pairs,
-                    arm1_to_start=True,
-                    arm2_to_start=True,
-                    arm1_assigned_object=None,
-                    arm2_assigned_object=None
-                )
-                return task_plan
+                start_goal_pairs += [(chain[-1], chain[-2]), (chain[-2], chain[-1])]
                 
             if self.dependency_graph.has_cycles():
                 # pick one cycle
                 print("Pick one cycle to break")
-                cycle = self.dependency_graph.get_cycles()[0]
-                assert len(cycle) > 1, "Cycle has to have more than one object"
-                if len(cycle) == 2:
-                    # switch them
-                    print("The cycle has two objects. Switch two objects.")
-                    print("cycle: ", cycle)
-                    task_plan = TaskPlan(
-                        arm1_gripper_action=GripperAction.CLOSE,
-                        arm2_gripper_action=GripperAction.CLOSE,
-                        start_goal_pairs=[(cycle[0], cycle[1]), (cycle[1], cycle[0])],
-                        arm1_to_start=True,
-                        arm2_to_start=True,
-                        arm1_assigned_object=None,
-                        arm2_assigned_object=None
-                    )
-                    return task_plan
-                else:
-                    # need to break the cycle, need a buffer position to store the object. Need a temporary goal
-                    print("The cycle has more than two objects. Break the cycle.")
-                    print("cycle: ", cycle)
-                    start_goal_pairs = []
-                    for i in range(len(cycle)):
-                        start_goal_pairs.append((cycle[i], cycle[(i+1)%len(cycle)]))
-                        start_goal_pairs.append((cycle[(i+1)%len(cycle)], cycle[i]))
-                    # random.shuffle(start_goal_pairs)
-                    task_plan = TaskPlan(
-                        arm1_gripper_action=GripperAction.CLOSE,
-                        arm2_gripper_action=GripperAction.CLOSE,
-                        start_goal_pairs=start_goal_pairs,
-                        arm1_to_start=True,
-                        arm2_to_start=True,
-                        arm1_assigned_object=None,
-                        arm2_assigned_object=None,
-                        use_buffer=True
-                    )
-                    return task_plan
+                for i in range(len(self.dependency_graph.cycles)):
+                    cycle = self.dependency_graph.get_cycles()[0]
+                    assert len(cycle) > 1, "Cycle has to have more than one object"
+                    if len(cycle) == 2:
+                        # switch them
+                        print("The cycle has two objects. Switch two objects.")
+                        print("cycle: ", cycle)
+                        use_buffer = False
+                        # cnt the number of the objects that have more than 1 dependencies
+                        cnt = sum([len(self.depends_on(i)) > 1 for i in cycle])
+                        if cnt == 1:
+                            use_buffer = True
+                        if cnt == 2:
+                            continue # there's no way to rearrange this
+                        task_plan = TaskPlan(
+                            arm1_gripper_action=GripperAction.CLOSE,
+                            arm2_gripper_action=GripperAction.CLOSE,
+                            start_goal_pairs=[(cycle[0], cycle[1]), (cycle[1], cycle[0])],
+                            arm1_to_start=True,
+                            arm2_to_start=True,
+                            arm1_assigned_object=None,
+                            arm2_assigned_object=None,
+                            use_buffer=use_buffer
+                        )
+                        return task_plan
+                    else:
+                        # need to break the cycle, need a buffer position to store the object. Need a temporary goal
+                        print("The cycle has more than two objects. Break the cycle.")
+                        print("cycle: ", cycle)
+                        for i in range(len(cycle)):
+                            # pick two consecutive objects
+                            if not len(self.depends_on( cycle[i] )) > 1:
+                                start_goal_pairs.append((cycle[i], cycle[(i+1)%len(cycle)]))
+                                start_goal_pairs.append((cycle[(i+1)%len(cycle)], cycle[i]))
+                        task_plan = TaskPlan(
+                            arm1_gripper_action=GripperAction.CLOSE,
+                            arm2_gripper_action=GripperAction.CLOSE,
+                            start_goal_pairs=start_goal_pairs,
+                            arm1_to_start=True,
+                            arm2_to_start=True,
+                            arm1_assigned_object=None,
+                            arm2_assigned_object=None,
+                            use_buffer=True
+                        )
+                        return task_plan
+
+            # sort the start and the goal pairs based on the sum of the start-start distance and the goal-goal distance
+            start_goal_pairs.sort(key=lambda x: np.linalg.norm(self.start_dict[x[0]] - self.start_dict[x[1]]) + np.linalg.norm(self.goal_dict[x[0]] - self.goal_dict[x[1]]))
+            task_plan = TaskPlan(
+                arm1_gripper_action=GripperAction.CLOSE,
+                arm2_gripper_action=GripperAction.CLOSE,
+                start_goal_pairs=start_goal_pairs,
+                arm1_to_start=True,
+                arm2_to_start=True,
+                arm1_assigned_object=None,
+                arm2_assigned_object=None
+                )
+            return task_plan
 
         elif self.all_arms_busy():
             # keep doing it
@@ -1052,6 +1060,7 @@ class Task:
         print(f"Arm2: {self.arm2_state}")
         self.build_start_goal_dict()
         self.dependency_graph = DependencyGraph(self.start_dict, self.goal_dict, self.object_size)   
+        self.draw_four_panel(None)
     
     def get_start(self, i: int):
         return self.starts[i]
