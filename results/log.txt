@@ -1,19 +1,33 @@
 Running evaluation on cycled_objects_10.json with method ours...
 pybullet build time: Nov 28 2023 23:45:17
 j_names_primary =  ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint', 'finger_joint', 'shoulder_pan_joint_1', 'shoulder_lift_joint_1', 'elbow_joint_1', 'wrist_1_joint_1', 'wrist_2_joint_1', 'wrist_3_joint_1', 'finger_joint_1']
-End effector link names: ['dummy_center_indicator_link_1', 'dummy_center_indicator_link']
-Curobo is Ready
-
-	cannot connect to X server
-
-argv[0]=
-startThreads creating 1 threads.
-starting thread 0
-started thread 0 
-argc=3
-argv[0] = --unused
-argv[1] = 
-argv[2] = --start_demo_name=Physics Server
-ExampleBrowserThreadFunc started
-X11 functions dynamically loaded using dlopen/dlsym OK!
-./run.sh: line 19: 110094 Killed                  python evaluation.py --input "$json_file" --method "$METHOD"
+Traceback (most recent call last):
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/dual_arm/evaluation.py", line 56, in <module>
+    dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, constrain_grasp_approach=False, num_buffers=20)
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/dual_arm/dual_arms.py", line 104, in __init__
+    single_motion_gen_config = MotionGenConfig.load_from_robot_config(
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/curobo_dual_ur5e/src/curobo/wrap/reacher/motion_gen.py", line 612, in load_from_robot_config
+    robot_cfg = RobotConfig.from_dict(robot_cfg, tensor_args)
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/curobo_dual_ur5e/src/curobo/types/robot.py", line 50, in from_dict
+    data_dict["kinematics"] = CudaRobotModelConfig.from_config(
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/curobo_dual_ur5e/src/curobo/cuda_robot_model/cuda_robot_model.py", line 248, in from_config
+    generator = CudaRobotGenerator(config)
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/curobo_dual_ur5e/src/curobo/cuda_robot_model/cuda_robot_generator.py", line 260, in __init__
+    self.initialize_tensors()
+  File "/home/duo/miniforge3/envs/dual_arm/lib/python3.10/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/curobo_dual_ur5e/src/curobo/cuda_robot_model/cuda_robot_generator.py", line 337, in initialize_tensors
+    self._build_kinematics_with_lock_joints(
+  File "/home/duo/miniforge3/envs/dual_arm/lib/python3.10/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/curobo_dual_ur5e/src/curobo/cuda_robot_model/cuda_robot_generator.py", line 641, in _build_kinematics_with_lock_joints
+    self._build_collision_model(
+  File "/home/duo/miniforge3/envs/dual_arm/lib/python3.10/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/curobo_dual_ur5e/src/curobo/cuda_robot_model/cuda_robot_generator.py", line 843, in _build_collision_model
+    ) = self._create_self_collision_thread_data(self_collision_distance)
+  File "/home/duo/miniforge3/envs/dual_arm/lib/python3.10/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/home/duo/Rutgers/ARC/dual_arm/dual_arm_dev/curobo_dual_ur5e/src/curobo/cuda_robot_model/cuda_robot_generator.py", line 924, in _create_self_collision_thread_data
+    all_val += 1
+KeyboardInterrupt
