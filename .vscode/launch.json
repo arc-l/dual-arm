@@ -49,7 +49,8 @@
             "args": [
                 "--input",
                 // "data/cycled_objects_7.json",
-                "data/random_objects_18.json",
+                // "data/random_objects_18.json",
+                "data/double_cycled_9.json",
                 "--method",
                 "ours"
             ]

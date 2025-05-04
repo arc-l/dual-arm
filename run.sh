@@ -2,6 +2,12 @@
 
 # Directory containing JSON files
 DATA_DIR="data"
+# results directory
+RESULTS_DIR="results"
+# Create results directory if it doesn't exist
+if [ ! -d "$RESULTS_DIR" ]; then
+    mkdir -p "$RESULTS_DIR"
+fi
 
 # Loop through all JSON files in the data directory
 for json_file in "$DATA_DIR"/*.json; do

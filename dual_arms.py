@@ -1051,7 +1051,6 @@ class DualArmEnv:
             self.task.update(task_execution_result)
         return task_plans
 
-    
     def check_object_collision_enabled(self):
         for obj in self.objects_curobo:
             name = obj.name
@@ -1072,13 +1071,10 @@ class DualArmEnv:
         if plan.shape[0] == 0:
             print("Empty JointState plan.")
             return
-
         cu_js = plan[-1].get_ordered_joint_state(self.j_names_primary)
         self.current_js = JointState.from_position(self.tensor_args.to_device(cu_js.position.reshape(1, -1)), self.j_names_primary)
-
         if self.headless:
             return 
-        
         cmd_idx = 0
         while cmd_idx < len(plan.position):
             cmd_state = plan[cmd_idx]
@@ -1088,19 +1084,57 @@ class DualArmEnv:
             self.step(20, sleep=True)
             cmd_idx += 1
 
+    def put_cubes_to_goal_to_solve_ik(self, ids: List[int]):
+        #TODO: comeback here
+        cuboids = []
+        if self.old_task_plan is None:
+            return
+        for i in range(self.task.num_objects):
+            cube_curobo = self.objects_curobo[i]
+            if i in ids:
+                p = self.task.get_goal(i)
+            else:
+                p = self.task.get_start(i)
+            cube_curobo.pose = [p[0], p[1], p[2], 1, 0, 0, 0]
+            cuboids.append(cube_curobo)
+        world_cfg_table = WorldConfig.from_dict(
+            load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
+        )
+        world_cfg_table.cuboid[0].pose[2] -= 0.02
+        self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid)
+        obs = cuboids + world_cfg_table.cuboid
+        self.world_cfg_curobo = WorldConfig(cuboid=obs)
+        self.ik_solver.update_world(self.world_cfg_curobo)
+    
+    def restore_ik_solver(self):
+        cuboids = []
+        if self.old_task_plan is None:
+            return
+        for i in range(self.task.num_objects):
+            cube_curobo = self.objects_curobo[i]
+            p = self.task.get_start(i)
+            cube_curobo.pose = [p[0], p[1], p[2], 1, 0, 0, 0]
+            cuboids.append(cube_curobo)
+        world_cfg_table = WorldConfig.from_dict(
+            load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
+        )
+        world_cfg_table.cuboid[0].pose[2] -= 0.02
+        self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid)
+        obs = cuboids + world_cfg_table.cuboid
+        self.world_cfg_curobo = WorldConfig(cuboid=obs)
+        self.ik_solver.update_world(self.world_cfg_curobo)
 
     def find_available_task(self, task_plan: TaskPlan):
         # first, find the avaiable task that uses vertical pick and place
         print("finding vertical pick and place")
         for combo in self.preferred_angles_combination:
             for indices in task_plan.start_goal_pairs:
-                start1 = self.task.get_start( indices[0] )
-                goal1 = self.task.get_goal( indices[0] )
-                start2 = self.task.get_start( indices[1] )
-                goal2 = self.task.get_goal( indices[1] )
+                start1, goal1, start2, goal2 = self.task.get_start( indices[0] ), self.task.get_goal( indices[0] ), self.task.get_start( indices[1] ), self.task.get_goal( indices[1] )
                 angle1, angle2 = combo
                 start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
+                self.put_cubes_to_goal_to_solve_ik(indices)
                 goal_ik_result = self.ik_solve_single(goal1, goal2, angle1, angle2)
+                self.restore_ik_solver()
                 if start_ik_result.success and goal_ik_result.success:
                     # [start_pos, goal_pos, orientation]
                     task_plan.arm1_assigned_object = indices[0]
@@ -1112,13 +1146,12 @@ class DualArmEnv:
         print("finding other angles")
         for combo in self.all_angles_combination:
             for indices in task_plan.start_goal_pairs:
-                start1 = self.task.get_start( indices[0] )
-                goal1 = self.task.get_goal( indices[0] )
-                start2 = self.task.get_start( indices[1] )
-                goal2 = self.task.get_goal( indices[1] )
+                start1, goal1, start2, goal2 = self.task.get_start( indices[0] ), self.task.get_goal( indices[0] ), self.task.get_start( indices[1] ), self.task.get_goal( indices[1] )
                 angle1, angle2 = combo
                 start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
+                self.put_cubes_to_goal_to_solve_ik(indices)
                 goal_ik_result = self.ik_solve_single(goal1, goal2, angle1, angle2)
+                self.restore_ik_solver()
                 if start_ik_result.success and goal_ik_result.success:
                     # [start_pos, goal_pos, orientation]
                     task_plan.arm1_assigned_object = indices[0]
@@ -1130,19 +1163,16 @@ class DualArmEnv:
         print("finding one by one")
         for combo in self.all_angles_combination:
             for indices in task_plan.start_goal_pairs:
-                start1 = self.task.get_start( indices[0] )
-                goal1 = self.task.get_goal( indices[0] )
-                start2 = self.task.get_start( indices[1] )
-                goal2 = self.task.get_goal( indices[1] )
+                start1, goal1, start2, goal2 = self.task.get_start( indices[0] ), self.task.get_goal( indices[0] ), self.task.get_start( indices[1] ), self.task.get_goal( indices[1] )
                 angle1, angle2 = combo
                 default_ee_pos1 = self.default_ee_pos[self.arm1]
                 default_ee_pos2 = self.default_ee_pos[self.arm2]
                 start_ik_result1 = self.ik_solve_single(default_ee_pos1, start2, angle1, angle2)
                 start_ik_result2 = self.ik_solve_single(start1, default_ee_pos2, angle1, angle2)
+                # no need to put the cubes to the goal because only one cube is moved. No unpredicted collision
                 goal_ik_result1 = self.ik_solve_single(default_ee_pos1, goal2, angle1, angle2)
                 goal_ik_result2 = self.ik_solve_single(goal1, default_ee_pos2, angle1, angle2)
                 if start_ik_result1.success and start_ik_result2.success and goal_ik_result1.success and goal_ik_result2.success:
-                    # [start_pos, goal_pos, orientation]
                     task_plan.arm1_assigned_object = indices[0]
                     task_plan.arm2_assigned_object = indices[1]
                     task_plan.arm1_angle = angle1
@@ -1156,15 +1186,11 @@ class DualArmEnv:
         for combo in self.preferred_angles_combination:
             for indices in task_plan.start_goal_pairs:
                 goal1_dependent_on_goal2 = self.task.is_direct_dependent(indices[0], indices[1])
-                start1 = self.task.get_start( indices[0] )
-                goal1 = self.task.get_goal( indices[0] )
-                start2 = self.task.get_start( indices[1] )
-                goal2 = self.task.get_goal( indices[1] )
+                start1, goal1, start2, goal2 = self.task.get_start( indices[0] ), self.task.get_goal( indices[0] ), self.task.get_start( indices[1] ), self.task.get_goal( indices[1] )
                 angle1, angle2 = combo
                 start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
                 if not start_ik_result.success:
                     continue
-                # use buffer for goal2
                 ik_goal2 = Pose(
                     position=self.tensor_args.to_device(np.zeros(3)),
                     quaternion=self.tensor_args.to_device(self.gripper_grasp_orientations[self.arm2][angle2]),
@@ -1281,9 +1307,6 @@ class DualArmEnv:
         js = js.get_ordered_joint_state(self.arm_joint_names)
         return js
         
-    def get_robot_dof_indices(self, joint_names: list):
-        return [self.robot.get_dof_index(name) for name in joint_names]
-
     def get_plan_single(self, result: MotionGenResult):
         cmd_plan = result.get_interpolated_plan()
         cmd_plan = self.single_motion_gen.get_full_js(cmd_plan)
@@ -1291,14 +1314,6 @@ class DualArmEnv:
             cmd_plan = cmd_plan.get_ordered_joint_state(self.j_names_primary)
         return cmd_plan
 
-    def fix_gripper(self, js: JointState):
-        gripper_primary_pos_dict = self.get_primary_gripper_position_dict()
-        positions = js.position.cpu().numpy()
-        for arm, gripper_primary_name in self.gripper_primary_joints_dict.items():
-            idx = self.common_js_names.index(gripper_primary_name)
-            positions[idx] = gripper_primary_pos_dict[gripper_primary_name] + 0.002 * self.gripper_closed[arm]
-        return positions
-    
     def get_current_arm_js(self):
         if self.headless:
             cu_js = self.remove_gripper_dof_from_js(self.current_js)
