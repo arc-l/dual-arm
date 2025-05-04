@@ -105,7 +105,7 @@ class Baseline(DualArmEnv):
             Width, Height,start_arr, goal_arr, size, action_list, 
             overlap_rate = 1.0, speed=speed, 
             time_step_size=time_step_size, control_mode=control_mode, 
-            gui=True, method=method, debug = True)
+            gui=True, method=method, debug = False)
         
         recorded_plan = result_dict['recorded_plan']
         recorded_plan = self.post_process(recorded_plan)
@@ -129,14 +129,7 @@ class Baseline(DualArmEnv):
                 cmd_plan = torch.cat(cmd_plan, dim=0)
                 cmd_plan = JointState.from_position(self.tensor_args.to_device(cmd_plan), self.arm_joint_names)
                 cmd_plan = self.single_motion_gen.get_full_js(cmd_plan)
-                # get only joint names that are in both:
-                if self.common_js_names == [] and self.common_js_indices == []:
-                    for x in self.dof_names:
-                        if x in cmd_plan.joint_names:
-                            self.common_js_indices.append(self.robot.get_dof_index(x))
-                            self.common_js_names.append(x)
-            
-                cmd_plan = cmd_plan.get_ordered_joint_state(self.common_js_names)
+                cmd_plan = cmd_plan.get_ordered_joint_state(self.j_names_primary)
                 plan.append(cmd_plan)
                 cmd_plan = []
                 
