@@ -417,24 +417,17 @@ class DualArmEnv:
             self.max_velocity if gripper1_action==GripperAction.CLOSE else -self.max_velocity,
             self.max_velocity if gripper2_action==GripperAction.CLOSE else -self.max_velocity
         ]
-        target_positions = [
-            0.8 if gripper1_action==GripperAction.CLOSE else 0.0,
-            0.8 if gripper2_action==GripperAction.CLOSE else 0.0
-        ]
+
         self._pb.setJointMotorControlArray(
             self.robot_id,
             self.gripper_primary_indices,
             pybullet.VELOCITY_CONTROL,
-            # targetPositions=target_positions,
             targetVelocities=target_velocities,
             forces=[10, 10],
         )
 
         old_positions = self._pb.getJointStates(self.robot_id, self.gripper_primary_indices)
         while True:
-            # for _ in range(240):
-            #     self.gripper_update()
-            #     self.step(1, sleep=False)
             self.gripper_update()
             self.step(1, sleep=True)
             new_positions = self._pb.getJointStates(self.robot_id, self.gripper_primary_indices)
