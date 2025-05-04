@@ -1,15 +1,11 @@
-Running evaluation on cycled_objects_10.json with method baseline...
-pybullet build time: Jan 29 2025 23:16:28
+Running evaluation on cycled_objects_10.json with method ours...
+pybullet build time: Nov 28 2023 23:45:17
 j_names_primary =  ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint', 'finger_joint', 'shoulder_pan_joint_1', 'shoulder_lift_joint_1', 'elbow_joint_1', 'wrist_1_joint_1', 'wrist_2_joint_1', 'wrist_3_joint_1', 'finger_joint_1']
 End effector link names: ['dummy_center_indicator_link_1', 'dummy_center_indicator_link']
 Curobo is Ready
 
-self.single_motion_gen.world_coll_checker.get_obstacle_names() =  ['object_0', 'object_1', 'object_2', 'object_3', 'object_4', 'object_5', 'object_6', 'object_7', 'object_8', 'object_9', 'table', None, None, None, None, None, None, None, None, None, None, None]
-start_arr {0: [277.25555614883035, 533.8643752120028], 1: [406.396441995152, 796.697684482044], 2: [905.6159716112961, 883.3851394839401], 3: [918.871266070269, 220.88520816327377], 4: [175.92062281009538, 286.78533045561915], 5: [594.3774988284715, 428.7784360704282], 6: [876.9765829477585, 545.9967928305587], 7: [456.95823184485226, 171.92130716897157], 8: [649.105612627901, 788.8803592678764], 9: [78.63953103144001, 874.9758474683167]}
-goal_arr {0: [406.396441995152, 796.697684482044], 1: [905.6159716112961, 883.3851394839401], 2: [918.871266070269, 220.88520816327377], 3: [175.92062281009538, 286.78533045561915], 4: [594.3774988284715, 428.7784360704282], 5: [876.9765829477585, 545.9967928305587], 6: [456.95823184485226, 171.92130716897157], 7: [649.105612627901, 788.8803592678764], 8: [78.63953103144001, 874.9758474683167], 9: [277.25555614883035, 533.8643752120028]}
-{0: [(0, 'S', 'G'), (2, 'S', '0'), (8, 'S', 'G'), (6, 'S', 'G'), (4, 'S', 'G'), (2, '0', 'G')], 1: [(1, 'S', '1'), (1, '1', 'G'), (9, 'S', 'G'), (7, 'S', 'G'), (5, 'S', 'G'), (3, 'S', 'G')]}
-here True
-time step 0.02
+	cannot connect to X server
+
 argv[0]=
 startThreads creating 1 threads.
 starting thread 0
@@ -20,85 +16,4 @@ argv[1] =
 argv[2] = --start_demo_name=Physics Server
 ExampleBrowserThreadFunc started
 X11 functions dynamically loaded using dlopen/dlsym OK!
-X11 functions dynamically loaded using dlopen/dlsym OK!
-Creating context
-Created GL 3.3 context
-Direct GLX rendering context obtained
-Making context current
-GL_VENDOR=NVIDIA Corporation
-GL_RENDERER=NVIDIA GeForce RTX 4090/PCIe/SSE2
-GL_VERSION=3.3.0 NVIDIA 570.133.20
-GL_SHADING_LANGUAGE_VERSION=3.30 NVIDIA via Cg compiler
-pthread_getconcurrency()=0
-Version = 3.3.0 NVIDIA 570.133.20
-Vendor = NVIDIA Corporation
-Renderer = NVIDIA GeForce RTX 4090/PCIe/SSE2
-b3Printf: Selected demo: Physics Server
-startThreads creating 1 threads.
-starting thread 0
-started thread 0 
-MotionThreadFunc thread started
-ven = NVIDIA Corporation
-ven = NVIDIA Corporation
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frame
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: base_link
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frame
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: base
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frame
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: flange
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frame
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: tool0
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frame
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: base_link
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frame
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: base
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frame
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: flange
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frame
-b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
-
-b3Printf: tool0
-Traceback (most recent call last):
-  File "/home/duo/Rutgers/ARC/dual_arm/dual-arm/evaluation.py", line 52, in <module>
-    plan = baseline.plan(use_our_planner=False)
-  File "/home/duo/Rutgers/ARC/dual_arm/dual-arm/baseline_dual_arm.py", line 104, in plan
-    result_dict, control = simulation(
-  File "/home/duo/Rutgers/ARC/dual_arm/dual-arm/baseline/motion_planning/simulation.py", line 77, in simulation
-    baseline_motion_planning(control, toppra_improve=False)
-  File "/home/duo/Rutgers/ARC/dual_arm/dual-arm/baseline/motion_planning/simulation.py", line 111, in baseline_motion_planning
-    control.update()
-  File "/home/duo/Rutgers/ARC/dual_arm/dual-arm/baseline/motion_planning/central_control.py", line 321, in update
-    self.stepSimulation()
-  File "/home/duo/Rutgers/ARC/dual_arm/dual-arm/baseline/motion_planning/central_control.py", line 766, in stepSimulation
-    self._pb.stepSimulation()
-KeyboardInterrupt
+./run.sh: line 19: 110094 Killed                  python evaluation.py --input "$json_file" --method "$METHOD"
