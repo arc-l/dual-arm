@@ -252,9 +252,6 @@ class DualArmEnv:
             object_id_goal = self._pb.createMultiBody(baseMass=0, baseCollisionShapeIndex=-1, baseVisualShapeIndex=object_visual_goal, basePosition=[goals[i][0], goals[i][1], goal_height])
             self.objects_pybullet.append(object_id_start)
             
-    def get_ready(self, reset=False, autostart=False):
-        self.reset()
-
     def reset(self):
         kin_state = self.single_motion_gen.kinematics.get_state(self.single_motion_gen.get_retract_config().view(1, -1))
         link_poses = kin_state.link_poses
@@ -536,7 +533,7 @@ class DualArmEnv:
         return obj, link, ray_frac
     
     def test_gripper_control(self):
-        self.get_ready()
+        self.reset()
         for i in range(3):
             self.gripper_control(GripperAction.CLOSE, GripperAction.CLOSE)
             self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
@@ -961,8 +958,8 @@ class DualArmEnv:
                 print("Finishing up for both arms")
         return task_plan
 
-    def plan(self, autostart=False):
-        self.get_ready(reset=True, autostart=autostart)
+    def plan(self):
+        self.reset()
         while not self.task.finished():
             task_plan = self.task_plan()
             task_execution_result = self.motion_plan(task_plan)
@@ -1013,7 +1010,7 @@ class DualArmEnv:
         return self.recorded_plan
     
     def plan_all(self):
-        self.get_ready()
+        self.reset()
         task_plans = []
         while not self.task.finished():
             starts = self.task.get_starts().copy()
@@ -1368,7 +1365,7 @@ class DualArmEnv:
         self.single_motion_gen.world_coll_checker.enable_obstacle(enable=True, name=cube_name)
 
     def test_different_grasp_angles(self):
-        self.get_ready()
+        self.reset()
         angles = [900, 450, -450, 901, 451, -451]
         # angles = [901, 451, -451]
         cube_positions = self.get_current_cube_pose()
@@ -1462,12 +1459,6 @@ class DualArmEnv:
         )
         mesh.save_as_mesh(file_path="results/scene.obj")
 
-    def display(self, reset=False):
-        if reset:
-            self.get_ready(reset=reset)
-        while self.simulation_app.is_running():
-            self.world.step(render=True)
-    
     def interpolate_joint_states(self, start_joints, end_joints):
         """
         Interpolates between two joint states without exceeding the maximum velocity.
@@ -1551,7 +1542,7 @@ class DualArmEnv:
         return ee_pos
     
     def test_move_ee(self):
-        self.get_ready()
+        self.reset()
         pos1 = self.default_ee_pos[self.arm1]
         pos2 = self.default_ee_pos[self.arm2]
         print("initial: pos1= ", pos1, "pos2= ", pos2)
@@ -1606,7 +1597,7 @@ class DualArmEnv:
         return traj
     
     def play(self, recorded_plan):
-        self.get_ready(reset=True)
+        self.reset()
         for section in recorded_plan:
             if type(section) == list:
                 self.gripper_control(section[0], section[1])

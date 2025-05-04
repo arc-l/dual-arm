@@ -16,7 +16,7 @@ from task import Task, GripperAction
 
 class Baseline(DualArmEnv):
     def __init__(self, task: Task):
-        super().__init__(task, headless=True, batch_size = 3, constrain_grasp_approach=False, visualize_spheres=False)
+        super().__init__(task, headless=True, batch_size = 3, constrain_grasp_approach=False)
     
     @staticmethod
     def convert_to_task_planner_space(pos):
@@ -72,8 +72,8 @@ class Baseline(DualArmEnv):
 
 
 
-    def plan(self, autostart=False, use_our_planner=False):
-        self.get_ready(autostart=autostart)
+    def plan(self, use_our_planner=False):
+        self.reset()
         start_arr, goal_arr = self.prepare_input()
         print("start_arr", start_arr)
         print("goal_arr", goal_arr)
