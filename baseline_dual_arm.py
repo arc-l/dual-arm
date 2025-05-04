@@ -1,4 +1,5 @@
 import curobo
+import timeout_decorator
 from curobo.types.state import JointState
 import os
 os.environ['CUROBO_TORCH_CUDA_GRAPH_RESET'] = '1'
@@ -72,6 +73,7 @@ class Baseline(DualArmEnv):
 
 
 
+    @timeout_decorator.timeout(1000)
     def plan(self, use_our_planner=False):
         self.reset()
         start_arr, goal_arr = self.prepare_input()
