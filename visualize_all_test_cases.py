@@ -1,5 +1,5 @@
 import os
-from task import Task  # Make sure your task.py is in the Python path
+from task import Task 
 
 # Main script to go through all .json task files
 data_folder = "data"

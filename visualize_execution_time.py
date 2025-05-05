@@ -6,21 +6,17 @@ import re
 results_folder = "results"
 execution_times = {}
 
-# Regex to extract number of objects and optional index
-pattern = re.compile(r'_([0-9]+)_objects(?:_([0-9]+))?')
 
 # Step 1: Read all duration files
 for filename in os.listdir(results_folder):
     if filename.endswith("_duration.txt"):
         parts = filename.rsplit("_", 2)
+        print(parts)
         testcase = parts[0]  # e.g., task_random_6_objects_1
         method = parts[1]    # ours or baseline
 
-        match = pattern.search(testcase)
-        if not match:
-            continue
-        num_objects = int(match.group(1))
-        index = int(match.group(2)) if match.group(2) is not None else 0
+        num_objects = int(parts[0].split("_")[-1])
+        index = num_objects
 
         # Read the float execution time
         with open(os.path.join(results_folder, filename), "r") as f:

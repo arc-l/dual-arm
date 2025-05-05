@@ -832,20 +832,34 @@ class Task:
                 return task_plan
 
             start_goal_pairs = []
-            if len(self.dependency_graph.independent_sets) > 1:
-                # pick two independent sets
-                print("Pick two independent sets.")
-                idx_to_be_rearranged = self.dependency_graph.independent_sets
-                start_goal_pairs += list(permutations(idx_to_be_rearranged, 2))
-                # random.shuffle(start_goal_pairs)
+            if len(self.dependency_graph.independent_sets) > 1 or self.dependency_graph.has_chains():
+                if len(self.dependency_graph.independent_sets) > 1:
+                    # pick two independent sets
+                    print("Pick two independent sets.")
+                    idx_to_be_rearranged = self.dependency_graph.independent_sets
+                    start_goal_pairs += list(permutations(idx_to_be_rearranged, 2))
+                    # random.shuffle(start_goal_pairs)
                 
-            if self.dependency_graph.has_chains():
-                # pick one chain
-                print("Pick one chain.")
-                chain = self.dependency_graph.get_chains()[0]
-                print("chain: ", chain)
-                assert len(chain) > 1, "Chain has to have more than one object"
-                start_goal_pairs += [(chain[-1], chain[-2]), (chain[-2], chain[-1])]
+                if self.dependency_graph.has_chains():
+                    # pick one chain
+                    print("Pick one chain.")
+                    chain = self.dependency_graph.get_chains()[0]
+                    print("chain: ", chain)
+                    assert len(chain) > 1, "Chain has to have more than one object"
+                    start_goal_pairs += [(chain[-1], chain[-2]), (chain[-2], chain[-1])]
+
+                # sort the start and the goal pairs based on the sum of the start-start distance and the goal-goal distance
+                start_goal_pairs.sort(key=lambda x: np.linalg.norm(self.start_dict[x[0]] - self.start_dict[x[1]]) + np.linalg.norm(self.goal_dict[x[0]] - self.goal_dict[x[1]]))
+                task_plan = TaskPlan(
+                    arm1_gripper_action=GripperAction.CLOSE,
+                    arm2_gripper_action=GripperAction.CLOSE,
+                    start_goal_pairs=start_goal_pairs,
+                    arm1_to_start=True,
+                    arm2_to_start=True,
+                    arm1_assigned_object=None,
+                    arm2_assigned_object=None
+                    )
+                return task_plan
                 
             if self.dependency_graph.has_cycles():
                 # pick one cycle
@@ -896,18 +910,6 @@ class Task:
                         )
                         return task_plan
 
-            # sort the start and the goal pairs based on the sum of the start-start distance and the goal-goal distance
-            start_goal_pairs.sort(key=lambda x: np.linalg.norm(self.start_dict[x[0]] - self.start_dict[x[1]]) + np.linalg.norm(self.goal_dict[x[0]] - self.goal_dict[x[1]]))
-            task_plan = TaskPlan(
-                arm1_gripper_action=GripperAction.CLOSE,
-                arm2_gripper_action=GripperAction.CLOSE,
-                start_goal_pairs=start_goal_pairs,
-                arm1_to_start=True,
-                arm2_to_start=True,
-                arm1_assigned_object=None,
-                arm2_assigned_object=None
-                )
-            return task_plan
 
         elif self.all_arms_busy():
             # keep doing it
@@ -1060,7 +1062,7 @@ class Task:
         print(f"Arm2: {self.arm2_state}")
         self.build_start_goal_dict()
         self.dependency_graph = DependencyGraph(self.start_dict, self.goal_dict, self.object_size)   
-        # self.draw_four_panel(None)
+        self.draw_four_panel(None)
     
     def get_start(self, i: int):
         return self.starts[i]

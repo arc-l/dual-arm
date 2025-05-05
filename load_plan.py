@@ -47,7 +47,7 @@ if __name__ == "__main__":
     task = Task.read_from_json(args.input)
     
     if args.method == "baseline":
-        planner = Baseline(task, None)
+        planner = Baseline(task, headless=False)
     else:
         # Call our method
         planner = DualArmEnv(task, headless=False, batch_size=3, constrain_grasp_approach=False)

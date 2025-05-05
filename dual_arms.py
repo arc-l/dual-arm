@@ -761,8 +761,8 @@ class DualArmEnv:
                 self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
                 self.add_plan_to_record([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
                 # go up
-                arm1_delta_z = 2 * self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
-                arm2_delta_z = 2 * self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                arm1_delta_z = self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
+                arm2_delta_z = self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
@@ -789,7 +789,7 @@ class DualArmEnv:
                 self.add_plan_to_record([GripperAction(self.gripper_closed[self.arm1]), task_plan.arm2_gripper_action])
                 # go up
                 arm1_delta_z = 0
-                arm2_delta_z = 2 * self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                arm2_delta_z = self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
@@ -811,7 +811,7 @@ class DualArmEnv:
                 self.add_plan_to_record([task_plan.arm1_gripper_action, GripperAction(self.gripper_closed[self.arm2])])
                 # go up
                 arm2_delta_z = 0
-                arm1_delta_z = 2 * self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                arm1_delta_z = self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
@@ -1504,6 +1504,7 @@ class DualArmEnv:
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
+        pos1[2] += delta
         pos2[2] += delta
         return self.move_ee(pos1, angle1, pos2, angle2)
     
@@ -1613,10 +1614,10 @@ class DualArmEnv:
 
 # debug
 if __name__ == '__main__':
-    test_grasp_angles = False
-    test_plan_all = True
+    test_grasp_angles = True
+    test_plan_all = False
     if test_grasp_angles:
-        num_objects:int = 4  
+        num_objects:int = 2  
         map_width:float = 0.6 
         map_length:float = 0.6 
         object_size:float = 0.05 
@@ -1631,11 +1632,10 @@ if __name__ == '__main__':
                           batch_size = 3,
                           constrain_grasp_approach=False,
                           )
-    # dual_arm.reset()
-    dual_arm.test_gripper_control()
-    exit(0)
+    dual_arm.reset()
     if test_grasp_angles:
         dual_arm.test_different_grasp_angles()
+        # dual_arm.plan()
     if test_plan_all:
         task_plans = dual_arm.plan_all()
         print(task_plans)
