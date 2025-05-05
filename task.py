@@ -1062,7 +1062,7 @@ class Task:
         print(f"Arm2: {self.arm2_state}")
         self.build_start_goal_dict()
         self.dependency_graph = DependencyGraph(self.start_dict, self.goal_dict, self.object_size)   
-        self.draw_four_panel(None)
+        # self.draw_four_panel(None)
     
     def get_start(self, i: int):
         return self.starts[i]
