@@ -16,9 +16,9 @@ from baseline.motion_planning.robot_arm import ControlMode
 from task import Task, GripperAction
 
 class Baseline(DualArmEnv):
-    def __init__(self, task: Task, headless=True):
+    def __init__(self, task: Task, headless=True, display=False):
         self.headless = headless
-        super().__init__(task, headless=True, batch_size = 3, constrain_grasp_approach=False)
+        super().__init__(task, headless=not display, batch_size = 3, constrain_grasp_approach=False)
     
     @staticmethod
     def convert_to_task_planner_space(pos):
@@ -85,6 +85,7 @@ class Baseline(DualArmEnv):
         control_mode = ControlMode.POSITION
         # size = 37.5 # 0.0225 / 0.6 * 1000
         size = 41.7 * np.sqrt(2) # 0.025 / 0.6 * 1000 * np.sqrt(2)
+        size = self.task.object_size/2 / self.task.map_length * 1000 # 0.025 / 0.6 * 1000 * np.sqrt(2)
         time_step_size = 0.02
         speed = 0.3141592653589793 * 5
         method = 'baseline_v2'

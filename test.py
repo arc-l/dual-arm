@@ -25,4 +25,4 @@ def generate_mixed(i):
     task.draw_four_panel(f"data_vis/mixed_{i}.png")
 
 if __name__ == "__main__":
-    generate_mixed(5)
+    generate_mixed(1)

@@ -365,7 +365,7 @@ def deepcopy_set(s):
     return set(list(s))
 
 
-def construct_DG(start_arr, goal_arr, radius):
+def construct_DG_cylinder(start_arr, goal_arr, radius):
     '''
     each pose: ( x, y)
     '''
@@ -379,6 +379,24 @@ def construct_DG(start_arr, goal_arr, radius):
                 (start_center[0]-goal_center[0])**2+
                 (start_center[1]-goal_center[1])**2
                 ) <= 2*radius):
+                DG[goal_obj].add(start_obj)
+    return DG
+
+
+def construct_DG(start_arr, goal_arr, radius):
+    '''
+    each pose: (x, y)
+    square size is 2*radius (side length), so half-width is radius
+    '''
+    DG = {}
+    for goal_obj, goal_center in goal_arr.items():
+        DG[goal_obj] = set()
+        for start_obj, start_center in start_arr.items():
+            if start_obj == goal_obj:
+                continue
+            # AABB collision check for squares
+            if (abs(start_center[0] - goal_center[0]) < 2 * radius and
+                abs(start_center[1] - goal_center[1]) < 2 * radius):
                 DG[goal_obj].add(start_obj)
     return DG
 

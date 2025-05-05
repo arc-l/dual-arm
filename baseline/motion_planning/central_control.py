@@ -137,12 +137,12 @@ class central_control(object):
             lineWidth=3
         )
 
-        self._pb.changeDynamics(
-            self.plane, -1, lateralFriction=2, restitution=0, linearDamping=2, angularDamping=2,
-        )
-        self._pb.changeDynamics(
-            self.workspace, -1, lateralFriction=2, restitution=0, linearDamping=2, angularDamping=2,
-        )
+        # self._pb.changeDynamics(
+        #     self.plane, -1, lateralFriction=2, restitution=0, linearDamping=2, angularDamping=2,
+        # )
+        # self._pb.changeDynamics(
+        #     self.workspace, -1, lateralFriction=2, restitution=0, linearDamping=2, angularDamping=2,
+        # )
 
       
 

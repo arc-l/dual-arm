@@ -429,7 +429,7 @@ class Task:
                 # sample a number of independent objects
                 independent_number = self.num_objects - cycle_number - chain_number
                 independent_starts = self.generate_random_postions(independent_number, collision_avoidance_list=cycle_starts+chain_starts, clearance=clearance)
-                independent_goals = self.generate_random_postions(independent_number, collision_avoidance_list=cycle_starts+chain_starts+independent_starts, clearance=clearance)
+                independent_goals = self.generate_random_postions(independent_number, collision_avoidance_list=cycle_goals+chain_goals, clearance=clearance)
                 self.starts = cycle_starts + chain_starts + independent_starts
                 self.goals = cycle_goals + chain_goals + independent_goals
             case _:

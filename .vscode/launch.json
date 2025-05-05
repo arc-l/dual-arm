@@ -31,13 +31,13 @@
                 "--input",
                 // "data/task_2_cycle.json",
                 // "data/random_objects_4.json",
-                "data/mixed_5.json",
+                "data/mixed_12.json",
                 // "data/random_objects_13.json",
-                // "data/cycled_objects_7.json",
+                // "data/cycled_objects_6.json",
                 // "data/double_cycled_6.json",
                 "--method",
-                // "ours"
-                "baseline"
+                "ours"
+                // "baseline"
             ]
         },
         {
@@ -50,8 +50,8 @@
                 "--input",
                 // "data/cycled_objects_7.json",
                 // "data/random_objects_18.json",
-                "data/random_objects_4.json",
-                // "data/double_cycled_9.json",
+                // "data/random_objects_4.json",
+                "data/double_cycled_6.json",
                 "--method",
                 // "ours"
                 "baseline"

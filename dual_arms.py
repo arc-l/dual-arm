@@ -1472,11 +1472,15 @@ class DualArmEnv:
         delta_joints = torch.abs(end_joints - start_joints)
         time_required = delta_joints / self.max_velocity
         total_time = torch.max(time_required)
-        num_steps = int(torch.ceil(total_time / self.interpolation_dt))
+        num_steps = int(torch.ceil(total_time / self.interpolation_dt)) + 1
         times = self.tensor_args.to_device(torch.linspace(0, 1, num_steps).view(-1, 1))
         interpolated_trajectories = start_joints + (end_joints - start_joints) * times
         if interpolated_trajectories.shape[0] == 0:
             print("interpolated_trajectories.shape[0] == 0")
+        vel = torch.diff(interpolated_trajectories, dim=0) / self.interpolation_dt # shape [T-1, D]
+        abs_vel = torch.abs(vel)
+        local_max, flat_idx = torch.max(abs_vel.view(-1), dim=0)
+        print(f"max speed = {local_max.item()} at index {flat_idx.item()}")
         return interpolated_trajectories
     
     def servoj(self, joints):

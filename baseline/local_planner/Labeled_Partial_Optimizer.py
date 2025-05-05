@@ -408,6 +408,20 @@ class Labeled_Partial_Optimizer(object):
             time_stamp += 1
         return obj_schedule, buffers
 
+    # def construct_DG(self, start_arr, goal_arr):
+    #     DG = {}
+    #     for goal_obj, goal_center in goal_arr.items():
+    #         DG[goal_obj] = set()
+    #         for start_obj, start_center in start_arr.items():
+    #             if start_obj == goal_obj:
+    #                 continue
+    #             self.num_collision += 1
+    #             if (sqrt((start_center[0]-goal_center[0])**2+
+    #             (start_center[1]-goal_center[1])**2) <= 2*self.radius):
+    #                 DG[goal_obj].add(start_obj)
+    #     return DG
+        
+    # change it to cube.
     def construct_DG(self, start_arr, goal_arr):
         DG = {}
         for goal_obj, goal_center in goal_arr.items():
@@ -416,8 +430,8 @@ class Labeled_Partial_Optimizer(object):
                 if start_obj == goal_obj:
                     continue
                 self.num_collision += 1
-                if (sqrt((start_center[0]-goal_center[0])**2+
-                (start_center[1]-goal_center[1])**2) <= 2*self.radius):
+                # Check AABB overlap for squares
+                if (abs(start_center[0] - goal_center[0]) < self.radius * 2 and
+                    abs(start_center[1] - goal_center[1]) < self.radius * 2):
                     DG[goal_obj].add(start_obj)
         return DG
-        
