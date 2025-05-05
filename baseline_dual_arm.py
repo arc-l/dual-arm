@@ -17,7 +17,8 @@ from task import Task, GripperAction
 
 class Baseline(DualArmEnv):
     def __init__(self, task: Task, headless=True):
-        super().__init__(task, headless=headless, batch_size = 3, constrain_grasp_approach=False)
+        self.headless = headless
+        super().__init__(task, headless=True, batch_size = 3, constrain_grasp_approach=False)
     
     @staticmethod
     def convert_to_task_planner_space(pos):
@@ -107,7 +108,7 @@ class Baseline(DualArmEnv):
             Width, Height,start_arr, goal_arr, size, action_list, 
             overlap_rate = 1.0, speed=speed, 
             time_step_size=time_step_size, control_mode=control_mode, 
-            gui=False, method=method, debug = False)
+            gui=self.headless, method=method, debug = False)
         
         recorded_plan = result_dict['recorded_plan']
         recorded_plan = self.post_process(recorded_plan)

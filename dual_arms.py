@@ -191,7 +191,8 @@ class DualArmEnv:
         
         self.preferred_angles = [901, 900]
         self.preferred_angles_combination = list(product(self.preferred_angles, repeat=2))
-        self.all_angles = [901, 900, 450, -450, 451, -451]
+        # self.all_angles = [901, 900, 450, -450, 451, -451]
+        self.all_angles = [901, 900, 450, -450]
         self.all_angles_combination = list(product(self.all_angles, repeat=2))
         # the current joint states. Used for headless planning
         self.current_js = JointState.from_position(self.tensor_args.to_device([self.default_config]), self.j_names)

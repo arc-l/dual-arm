@@ -1,56 +1,90 @@
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-import re
 
+data_folder = "data"
 results_folder = "results"
-execution_times = {}
+execution_times_by_type = {}
 
+# Define fixed order of testcase types
+testcase_types_order = ["mixed", "cycled", "double_cycled", "random"]
 
-# Step 1: Read all duration files
-for filename in os.listdir(results_folder):
-    if filename.endswith("_duration.txt"):
-        parts = filename.rsplit("_", 2)
-        print(parts)
-        testcase = parts[0]  # e.g., task_random_6_objects_1
-        method = parts[1]    # ours or baseline
+# Helper to extract number of objects from testcase name
+def extract_num_objects(name):
+    parts = name.split("_")
+    for part in reversed(parts):
+        if part.isdigit():
+            return int(part)
+    return 0
 
-        num_objects = int(parts[0].split("_")[-1])
-        index = num_objects
+# Step 1: Process each JSON testcase
+for filename in os.listdir(data_folder):
+    if not filename.endswith(".json"):
+        continue
+    testcase_name = filename[:-5]  # Remove ".json"
+    ours_file = f"{testcase_name}_ours_duration.txt"
+    baseline_file = f"{testcase_name}_baseline_duration.txt"
 
-        # Read the float execution time
-        with open(os.path.join(results_folder, filename), "r") as f:
-            exec_time = float(f.read().strip())
+    ours_path = os.path.join(results_folder, ours_file)
+    baseline_path = os.path.join(results_folder, baseline_file)
 
-        # Store under testcase name
-        if testcase not in execution_times:
-            execution_times[testcase] = {'num_objects': num_objects, 'index': index}
-        execution_times[testcase][method] = exec_time
+    # Default values
+    ours_time = 0.0
+    baseline_time = 0.0
 
-# Step 2: Filter only testcases with both methods
-valid_cases = {
-    name: data for name, data in execution_times.items()
-    if "ours" in data and "baseline" in data
-}
+    if not os.path.exists(ours_path):
+        print(f"[Missing ours]     {ours_file}")
+    else:
+        try:
+            with open(ours_path, "r") as f:
+                ours_time = float(f.read().strip())
+        except ValueError:
+            print(f"[Parse error ours] {ours_file}")
 
-# Step 3: Sort by (num_objects, index)
-sorted_items = sorted(
-    valid_cases.items(),
-    key=lambda item: (item[1]['num_objects'], item[1]['index'])
-)
+    if not os.path.exists(baseline_path):
+        print(f"[Missing baseline] {baseline_file}")
+    else:
+        try:
+            with open(baseline_path, "r") as f:
+                baseline_time = float(f.read().strip())
+        except ValueError:
+            print(f"[Parse error baseline] {baseline_file}")
 
-# Step 4: Prepare data for plotting
-testcase_names = [name for name, _ in sorted_items]
-ours_times = [data["ours"] for _, data in sorted_items]
-baseline_times = [data["baseline"] for _, data in sorted_items]
+    # Determine testcase type
+    testcase_type = next((t for t in testcase_types_order if testcase_name.startswith(t)), "other")
 
-# Step 5: Plot
+    num_objects = extract_num_objects(testcase_name)
+
+    if testcase_type not in execution_times_by_type:
+        execution_times_by_type[testcase_type] = []
+
+    execution_times_by_type[testcase_type].append({
+        "name": testcase_name,
+        "ours": ours_time,
+        "baseline": baseline_time,
+        "num_objects": num_objects
+    })
+
+# Step 2: Sort within each type and collect in final list
+sorted_cases = []
+for t_type in testcase_types_order:
+    if t_type in execution_times_by_type:
+        sorted_cases.extend(
+            sorted(execution_times_by_type[t_type], key=lambda x: x["num_objects"])
+        )
+
+# Step 3: Prepare data for plotting
+testcase_names = [case["name"] for case in sorted_cases]
+ours_times = [case["ours"] for case in sorted_cases]
+baseline_times = [case["baseline"] for case in sorted_cases]
+
+# Step 4: Plot
 x = np.arange(len(testcase_names))
 width = 0.35
 
-fig, ax = plt.subplots(figsize=(12, 6))
-ax.bar(x - width/2, baseline_times, width, label="Baseline", color='gray')
-ax.bar(x + width/2, ours_times, width, label="Ours", color='blue')
+fig, ax = plt.subplots(figsize=(14, 6))
+ax.bar(x - width / 2, baseline_times, width, label="Baseline", color='gray')
+ax.bar(x + width / 2, ours_times, width, label="Ours", color='blue')
 
 ax.set_xlabel("Test Cases")
 ax.set_ylabel("Execution Time (s)")
@@ -60,4 +94,5 @@ ax.set_xticklabels(testcase_names, rotation=45, ha="right")
 ax.legend()
 plt.tight_layout()
 plt.savefig("results/execution_time_comparison.png", dpi=500)
+print("Plot saved as results/execution_time_comparison.png")
 plt.show()

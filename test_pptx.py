@@ -1,41 +1,28 @@
-from pptx import Presentation
-from pptx.util import Inches, Pt
-from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
-from pptx.dml.color import RGBColor
-from pptx.oxml import parse_xml
+import os, shutil
+import re
+from task import Task, generate_dataset
 
-prs = Presentation()
-slide = prs.slides.add_slide(prs.slide_layouts[5])
+object_size = 0.045
+table_size = 0.6
 
-start_x = Inches(2.5)
-start_y = Inches(2)
-end_x = Inches(4)
-end_y = Inches(4)
-shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(1), Inches(1), Inches(2), Inches(2))
-print(f"start_x: {start_x}, start_y: {start_y}, end_x: {end_x}, end_y: {end_y}")
-connector = slide.shapes.add_connector(
-    MSO_CONNECTOR.STRAIGHT,
-    start_x, start_y,
-    end_x, end_y
-)
-connector.line.color.rgb = RGBColor(0, 0, 0)
-connector.line.width = Pt(2)
-connector.line.end_arrowhead = True
-line_elem = connector.line._get_or_add_ln()
-line_elem.append(parse_xml("""
-        <a:headEnd type="arrow" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
-"""))
 
-connector = slide.shapes.add_connector(
-    MSO_CONNECTOR.STRAIGHT,
-    end_x, end_y,
-    start_x, start_y
-)
-connector.line.color.rgb = RGBColor(0, 0, 0)
-connector.line.width = Pt(2)
-connector.line.end_arrowhead = True
-line_elem = connector.line._get_or_add_ln()
-line_elem.append(parse_xml("""
-        <a:headEnd type="arrow" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
-"""))
-prs.save("results/test_connector.pptx")
+def generate_mixed(i):
+    task = Task(i, table_size, table_size, object_size)
+    try:
+        task.generate(gen_type="mixed", clearance=0.2)
+    except Exception as e:
+        print("clearance 0.1 failed, trying clearance 0.1")
+        try:
+            task.generate(gen_type="mixed", clearance=0.1)
+        except Exception as e:
+            print("clearance 0.1 failed, trying clearance 0.05")
+            try:
+                task.generate(gen_type="mixed", clearance=0.05)
+            except Exception as e:
+                print("clearance 0.05 failed, trying clearance 0.0")
+                task.generate(gen_type="mixed", clearance=0.0)
+    task.write_to_json(f"data/mixed_{i}.json")
+    task.draw_four_panel(f"data_vis/mixed_{i}.png")
+
+if __name__ == "__main__":
+    generate_mixed(5)
