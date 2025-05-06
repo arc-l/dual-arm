@@ -53,7 +53,7 @@ if __name__ == "__main__":
         # baseline.play(plan)
     else:
         # Call our method
-        dual_arm_env = DualArmEnv(task, headless=True, batch_size=3, constrain_grasp_approach=False, num_buffers=20)
+        dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, constrain_grasp_approach=False, num_buffers=20)
         plan = dual_arm_env.plan()
 
     duration = get_duration(plan)
