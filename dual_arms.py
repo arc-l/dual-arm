@@ -1,14 +1,12 @@
-import curobo
 import os
+import copy
 os.environ['CUROBO_TORCH_CUDA_GRAPH_RESET'] = '1'
-import random
-from itertools import permutations, product
+from itertools import product
 from packaging import version
 
 import numpy as np
 import time
 from typing import List
-import helper
 import torch
 def is_cuda_graph_reset_available():
     reset_cuda_graph = os.environ.get("CUROBO_TORCH_CUDA_GRAPH_RESET")
@@ -769,6 +767,16 @@ class DualArmEnv:
                 self.add_plan_to_record(cmd_plan)
             else:
                 # one arm by one arm
+                # if the arms are going to the start positions, recalculate the angles since if we do it with one are, there might be simpler solutions
+                arm1_angle = copy.deepcopy(task_plan.arm1_angle)
+                arm2_angle = copy.deepcopy(task_plan.arm2_angle)
+                arm1_assigned_object = copy.deepcopy( task_plan.arm1_assigned_object)
+                arm2_assigned_object = copy.deepcopy( task_plan.arm2_assigned_object)
+                if task_plan.arm2_to_start:
+                    task_plan.arm1_assigned_object = None
+                    self.find_angle_for_single_arm(task_plan, self.arm2)
+                    arm2_angle = task_plan.arm2_angle
+
                 #TODO: Check the order of the arms. If arm1's goal is dependent on arm2's goal, then we can't move arm1 first and vice versa.
                 tmp_goal_arm1 = self.default_ee_pos[self.arm1]
                 tmp_goal_arm2 = self.default_ee_pos[self.arm2]
@@ -796,6 +804,11 @@ class DualArmEnv:
                 self.add_plan_to_record(cmd_plan)
 
                 # move the other arm
+                if task_plan.arm1_to_start:
+                    task_plan.arm2_assigned_object = None
+                    task_plan.arm1_assigned_object = arm1_assigned_object
+                    self.find_angle_for_single_arm(task_plan, self.arm1, other_angle=arm2_angle)
+                    arm1_angle = task_plan.arm1_angle
                 result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=tmp_goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
                 cmd_plan = self.get_plan_single(result)
                 cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
@@ -803,7 +816,7 @@ class DualArmEnv:
                 self.add_plan_to_record(cmd_plan)
                 # go down
                 arm2_delta_z = 0
-                arm1_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
@@ -812,10 +825,17 @@ class DualArmEnv:
                 self.add_plan_to_record([task_plan.arm1_gripper_action, GripperAction(self.gripper_closed[self.arm2])])
                 # go up
                 arm2_delta_z = 0
-                arm1_delta_z = self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+                arm1_delta_z = self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
                 cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
+
+                task_execution_result.arm1_angle = arm1_angle
+                task_execution_result.arm2_angle = arm2_angle
+                task_plan.arm1_angle = arm1_angle
+                task_plan.arm2_angle = arm2_angle
+                task_plan.arm1_assigned_object = arm1_assigned_object
+                task_plan.arm2_assigned_object = arm2_assigned_object
 
         return task_execution_result
     
@@ -1255,12 +1275,12 @@ class DualArmEnv:
                 print("goal1_dependent_on_goal2 = ", goal1_dependent_on_goal2)
                 return 
                 
-    def find_angle_for_single_arm(self, task_plan: TaskPlan, arm: str):
+    def find_angle_for_single_arm(self, task_plan: TaskPlan, arm: str, other_angle: float|None=None):
         if arm == self.arm1:
             for angle in self.all_angles:
                 start1 = self.default_ee_pos[self.arm1]
                 goal1 = self.default_ee_pos[self.arm1]
-                angle2 = 900
+                angle2 = 900 if other_angle is None else other_angle
                 start2 = self.default_ee_pos[self.arm2]
                 goal2 = self.default_ee_pos[self.arm2]
                 if task_plan.arm1_assigned_object != -1 and task_plan.arm1_assigned_object is not None:
@@ -1285,7 +1305,7 @@ class DualArmEnv:
                 goal1 = self.default_ee_pos[self.arm1]
                 start2 = self.default_ee_pos[self.arm2]
                 goal2 = self.default_ee_pos[self.arm2]
-                angle1 = 900
+                angle1 = 900 if other_angle is None else other_angle
                 if task_plan.arm1_assigned_object != -1 and task_plan.arm1_assigned_object is not None:
                     start1 = self.task.get_start( task_plan.arm1_assigned_object )
                     goal1 = self.task.get_goal( task_plan.arm1_assigned_object )
