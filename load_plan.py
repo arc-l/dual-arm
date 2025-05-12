@@ -11,7 +11,7 @@ def parse_arguments():
     
     parser.add_argument(
         "--method",
-        choices=["baseline", "ours"],
+        choices=["baseline", "ours", "baseline_with_our_tp"],
         required=True,
         help="Specify the method to use: 'baseline' or 'ours'."
     )
@@ -50,12 +50,13 @@ if __name__ == "__main__":
     print(f"State index: {state_index}")
     print(f"Time index: {time_index}")
     print(f"Joint index: {joint_index}")
-    exit(0)
     
     
     task = Task.read_from_json(args.input)
     
     if args.method == "baseline":
+        planner = Baseline(task, headless=False, display=True)
+    elif args.method == "baseline_with_our_tp":
         planner = Baseline(task, headless=False, display=True)
     else:
         # Call our method

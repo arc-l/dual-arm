@@ -913,7 +913,7 @@ class Task:
 
         elif self.all_arms_busy():
             # keep doing it
-            print("Both arms are busy, keep finishing up.")
+            print(f"Both arms are busy, keep finishing up. Arm1: {self.arm1_state.assigned_object}, Arm2: {self.arm2_state.assigned_object}")
             task_plan = TaskPlan(
                 arm1_gripper_action=self.arm1_state.gripper_state.reverse_action(),
                 arm2_gripper_action=self.arm2_state.gripper_state.reverse_action(),

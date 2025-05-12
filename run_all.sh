@@ -44,10 +44,10 @@ for json_file in "$DATA_DIR"/*.json; do
         filename=$(basename "$json_file")
         
         # Skip files that start with "double_cycled" if method is baseline
-        if [[ "$METHOD" == "baseline" && "$filename" == double_cycled* ]]; then
-            echo "Skipping $filename for baseline method."
-            continue
-        fi
+        # if [[ "$METHOD" == "baseline" && "$filename" == double_cycled* ]]; then
+        #     echo "Skipping $filename for baseline method."
+        #     continue
+        # fi
 
         echo "Running evaluation on $filename with method $METHOD..."
         python evaluation.py --input "$json_file" --method "$METHOD"

@@ -1000,7 +1000,6 @@ class DualArmEnv:
                 sync_before_close = True
             
             if sync_before_close:
-                print("Syncing IsaacSim and Curobo before close, idx_to_sync = ", idx_to_sync)
                 # self.sync_isaacsim_curobo(idx_to_sync=idx_to_sync)
                 self.sync_isaacsim_curobo()
 
@@ -1022,7 +1021,6 @@ class DualArmEnv:
                 self.detach_obj(cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name=self.arm2)
 
             if sync_after_open:
-                print("Syncing IsaacSim and Curobo after open, idx_to_sync = ", idx_to_sync)
                 # self.sync_isaacsim_curobo(idx_to_sync=idx_to_sync)
                 self.sync_isaacsim_curobo()
 
@@ -1340,9 +1338,6 @@ class DualArmEnv:
                     task_plan.arm2_angle = 900
                     return
     
-    def remove_gripper_dof_from_js(self, js: JointState):
-        js = js.get_ordered_joint_state(self.arm_joint_names)
-        return js
         
     def get_plan_single(self, result: MotionGenResult):
         cmd_plan = result.get_interpolated_plan()
@@ -1353,7 +1348,7 @@ class DualArmEnv:
 
     def get_current_arm_js(self):
         if self.headless:
-            cu_js = self.remove_gripper_dof_from_js(self.current_js)
+            cu_js = self.current_js.get_ordered_joint_state(self.arm_joint_names)
             return cu_js
         positions = self._pb.getJointStates(
             self.robot_id,
@@ -1497,10 +1492,10 @@ class DualArmEnv:
         interpolated_trajectories = start_joints + (end_joints - start_joints) * times
         if interpolated_trajectories.shape[0] == 0:
             print("interpolated_trajectories.shape[0] == 0")
-        vel = torch.diff(interpolated_trajectories, dim=0) / self.interpolation_dt # shape [T-1, D]
-        abs_vel = torch.abs(vel)
-        local_max, flat_idx = torch.max(abs_vel.view(-1), dim=0)
-        print(f"max speed = {local_max.item()} at index {flat_idx.item()}")
+        # vel = torch.diff(interpolated_trajectories, dim=0) / self.interpolation_dt # shape [T-1, D]
+        # abs_vel = torch.abs(vel)
+        # local_max, flat_idx = torch.max(abs_vel.view(-1), dim=0)
+        # print(f"max speed = {local_max.item()} at index {flat_idx.item()}")
         return interpolated_trajectories
     
     def servoj(self, joints):

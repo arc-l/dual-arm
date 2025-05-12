@@ -36,8 +36,9 @@
                 // "data/cycled_objects_6.json",
                 // "data/double_cycled_8.json",
                 "--method",
-                "ours"
+                // "ours"
                 // "baseline"
+                "baseline_with_our_tp"
             ]
         },
         {
@@ -51,10 +52,12 @@
                 // "data/cycled_objects_7.json",
                 // "data/random_objects_18.json",
                 // "data/random_objects_4.json",
-                "data/double_cycled_6.json",
+                // "data/double_cycled_6.json",
+                "data/mixed_3.json",
                 "--method",
                 // "ours"
-                "baseline"
+                // "baseline"
+                "baseline_with_our_tp"
             ]
         },
         {
