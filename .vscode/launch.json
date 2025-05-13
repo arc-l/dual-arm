@@ -37,8 +37,8 @@
                 // "data/double_cycled_8.json",
                 "--method",
                 // "ours"
-                // "baseline"
-                "baseline_with_our_tp"
+                "baseline"
+                // "baseline_with_our_tp"
             ]
         },
         {
@@ -57,7 +57,8 @@
                 "--method",
                 // "ours"
                 // "baseline"
-                "baseline_with_our_tp"
+                // "baseline_with_our_tp"
+                "ours_with_baseline_tp"
             ]
         },
         {

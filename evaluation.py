@@ -12,7 +12,7 @@ def parse_arguments():
     
     parser.add_argument(
         "--method",
-        choices=["baseline", "ours", "baseline_with_our_tp"],
+        choices=["baseline", "ours", "baseline_with_our_tp", "ours_with_baseline_tp"],
         required=True,
         help="Specify the method to use: 'baseline' or 'ours'."
     )
@@ -49,11 +49,14 @@ if __name__ == "__main__":
     
     if args.method == "baseline":
         baseline = Baseline(task, headless=False, display=False)
-        plan = baseline.plan(use_our_planner=False)
+        plan = baseline.plan(use_our_tp=False)
         # baseline.play(plan)
     elif args.method == "baseline_with_our_tp":
         baseline = Baseline(task, headless=False, display=False)
-        plan = baseline.plan(use_our_planner=True)
+        plan = baseline.plan(use_our_tp=True, use_our_mp=False)
+    elif args.method == "ours_with_baseline_tp":
+        baseline = Baseline(task, headless=True, display=True)
+        plan = baseline.plan(use_our_tp=False, use_our_mp=True)
     else:
         # Call our method
         dual_arm_env = DualArmEnv(task, headless=True, batch_size=3, constrain_grasp_approach=False, num_buffers=20)

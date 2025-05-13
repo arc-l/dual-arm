@@ -956,8 +956,7 @@ class DualArmEnv:
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
     
-    def task_plan(self):
-        task_plan = self.task.plan()
+    def filter_task_plans(self, task_plan: TaskPlan):
         if task_plan.start_goal_pairs is not None and not task_plan.use_buffer:
             print("Pick two from the start_goal_pairs")
             self.find_available_task(task_plan)
@@ -978,6 +977,11 @@ class DualArmEnv:
             else:
                 print("Finishing up for both arms")
         return task_plan
+
+    def task_plan(self, task_plan: TaskPlan = None):
+        if task_plan is None:
+            task_plan = self.task.plan()
+        return self.filter_task_plans(task_plan)
 
     def plan(self):
         self.reset()
@@ -1028,7 +1032,7 @@ class DualArmEnv:
             self.task.update(task_execution_result)
         return self.recorded_plan
     
-    def plan_all(self):
+    def plan_all(self)->List[TaskPlan]:
         self.reset()
         task_plans = []
         while not self.task.finished():

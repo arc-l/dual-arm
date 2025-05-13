@@ -13,7 +13,7 @@ from baseline.motion_planning.simulation import simulation
 from baseline.high_level_planners.Bi_Directional_Search_Tree_Planner import Bi_Directional_Search_Tree_Planner
 from baseline.experiments import plan2schedule
 from baseline.motion_planning.robot_arm import ControlMode
-from task import Task, GripperAction
+from task import Task, GripperAction, TaskPlan
 
 class Baseline(DualArmEnv):
     def __init__(self, task: Task, headless=True, display=False):
@@ -75,11 +75,9 @@ class Baseline(DualArmEnv):
 
 
     @timeout_decorator.timeout(300)
-    def plan(self, use_our_planner=False):
+    def plan(self, use_our_tp=False, use_our_mp=False):
         self.reset()
         start_arr, goal_arr = self.prepare_input()
-        print("start_arr", start_arr)
-        print("goal_arr", goal_arr)
         Height = 1000
         Width = 1000
         control_mode = ControlMode.POSITION
@@ -89,7 +87,7 @@ class Baseline(DualArmEnv):
         time_step_size = 0.02
         speed = 0.3141592653589793 * 5
         method = 'baseline_v2'
-        if use_our_planner:
+        if use_our_tp:
             action_list = self.plan_all()
         else:
             planner = Bi_Directional_Search_Tree_Planner(
@@ -105,16 +103,17 @@ class Baseline(DualArmEnv):
             )
             action_list = planner.action_list
         action_list = plan2schedule(action_list)
-        result_dict, control = simulation(
-            Width, Height,start_arr, goal_arr, size, action_list, 
-            overlap_rate = 1.0, speed=speed, 
-            time_step_size=time_step_size, control_mode=control_mode, 
-            gui=not self.headless, method=method, debug = False)
-        
-        recorded_plan = result_dict['recorded_plan']
-        recorded_plan = self.post_process(recorded_plan)
+        if use_our_mp:
+            self.motion_plan(action_list)
+        else:
+            result_dict, control = simulation(
+                Width, Height,start_arr, goal_arr, size, action_list, 
+                overlap_rate = 1.0, speed=speed, 
+                time_step_size=time_step_size, control_mode=control_mode, 
+                gui=not self.headless, method=method, debug = False)
+            recorded_plan = result_dict['recorded_plan']
+            recorded_plan = self.post_process(recorded_plan)
         return recorded_plan
-        
     
     def post_process(self, recorded_plan):
         plan = []
@@ -169,6 +168,63 @@ class Baseline(DualArmEnv):
                 else:
                     gripper_closed[self.arm2] = False
         return plan
+
+
+    def motion_plan(self, action_list):
+        for i in range(max(len(action_list[0]), len(action_list[1]))):
+            # transfer the action to a task_plan - to go to the start
+            if i < len(action_list[0]):
+                arm1_object = action_list[0][i][0]
+            else:
+                arm1_object = None
+
+            if i < len(action_list[1]): 
+                arm2_object = action_list[1][i][0]
+            else:
+                arm2_object = None
+
+            task_plan_to_start = TaskPlan(
+                start_goal_pairs=[(arm1_object, arm2_object)],
+                arm1_assigned_object=arm1_object,
+                arm2_assigned_object=arm2_object,
+                arm1_gripper_action=GripperAction.CLOSE,
+                arm2_gripper_action=GripperAction.CLOSE,
+                arm1_to_start=True,
+                arm2_to_start=True,
+                buffer=None,
+                use_buffer=False
+            )
+            task_plan_to_start = super().filter_task_plans(task_plan_to_start)
+            # place the object in the goal
+            super().motion_plan(task_plan_to_start)
+        
+            self.task.buffer_dict[i] = action_list[0][i][4]
+            self.task.buffer_dict[i] = action_list[1][i][4]
+
+            task_plan_to_goal = TaskPlan(
+                start_goal_pairs=None,
+                arm1_assigned_object=arm1_object,
+                arm2_assigned_object=arm2_object,
+                arm1_gripper_action=GripperAction.OPEN,
+                arm2_gripper_action=GripperAction.OPEN,
+                arm1_angle = task_plan_to_start.arm1_angle,
+                arm2_angle = task_plan_to_start.arm2_angle,
+                arm1_to_start=False,
+                arm2_to_start=False,
+                buffer=None,
+                use_buffer=False,
+            )
+
+            super().motion_plan(task_plan_to_goal)
+        
+        return self.recorded_plan
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
     # task = Task.read_from_json('data/task.json')
