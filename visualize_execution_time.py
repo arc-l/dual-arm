@@ -8,8 +8,13 @@ execution_times_by_type = {}
 
 # Define fixed order of testcase types
 testcase_types_order = ["mixed", "cycled", "double_cycled", "random"]
-methods = ["ours", "baseline", "baseline_with_our_tp"]
-colors = {"baseline": "gray", "ours": "blue", "baseline_with_our_tp": "green"}
+methods = ["ours", "baseline", "baseline_with_our_tp", "ours_with_baseline_tp"]
+colors = {
+    "baseline": "gray",
+    "ours": "blue",
+    "baseline_with_our_tp": "green",
+    "ours_with_baseline_tp": "orange",
+}
 
 # Helper to extract number of objects from testcase name
 def extract_num_objects(name):
@@ -63,23 +68,26 @@ for t_type in testcase_types_order:
 # Step 3: Prepare data for plotting
 testcase_names = [case["name"] for case in sorted_cases]
 x = np.arange(len(testcase_names))
-width = 0.25
+width = 0.2
 
 # Bar positions
-baseline_x = x - width
-ours_x = x
-tp_x = x + width
+baseline_x = x - 1.5 * width
+ours_x = x - 0.5 * width
+tp_x = x + 0.5 * width
+ours_tp_x = x + 1.5 * width
 
 # Get times
 baseline_times = [case["baseline"] for case in sorted_cases]
 ours_times = [case["ours"] for case in sorted_cases]
 tp_times = [case["baseline_with_our_tp"] for case in sorted_cases]
+ours_tp_times = [case["ours_with_baseline_tp"] for case in sorted_cases]
 
 # Step 4: Plot
 fig, ax = plt.subplots(figsize=(16, 6))
 ax.bar(baseline_x, baseline_times, width, label="Baseline", color=colors["baseline"])
 ax.bar(tp_x, tp_times, width, label="Baseline w/ Our TP", color=colors["baseline_with_our_tp"])
 ax.bar(ours_x, ours_times, width, label="Ours", color=colors["ours"])
+ax.bar(ours_tp_x, ours_tp_times, width, label="Ours w/ Baseline TP", color=colors["ours_with_baseline_tp"])
 
 ax.set_xlabel("Test Cases")
 ax.set_ylabel("Execution Time (s)")

@@ -965,11 +965,11 @@ class DualArmEnv:
             self.find_available_task_with_buffers(task_plan)
         elif task_plan.start_goal_pairs is None:
             print("Start and Goal pairs are None")
-            if task_plan.arm2_assigned_object is not None and task_plan.arm1_assigned_object == -1:
+            if task_plan.arm2_assigned_object is not None and (task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None):
                 print("Finishing up for one arm2")
                 if task_plan.arm2_angle is None:
                     self.find_angle_for_single_arm(task_plan, self.arm2)
-            elif task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object == -1:  
+            elif task_plan.arm1_assigned_object is not None and (task_plan.arm2_assigned_object == -1 or task_plan.arm2_assigned_object is None):  
                 print("Finishing up for one arm1")
                 if task_plan.arm1_angle is None:
                     self.find_angle_for_single_arm(task_plan, self.arm1)
@@ -1190,9 +1190,11 @@ class DualArmEnv:
                 default_ee_pos2 = self.default_ee_pos[self.arm2]
                 start_ik_result1 = self.ik_solve_single(default_ee_pos1, start2, angle1, angle2)
                 start_ik_result2 = self.ik_solve_single(start1, default_ee_pos2, angle1, angle2)
+                print("start_ik_result1 = ", start_ik_result1.success, "start_ik_result2 = ", start_ik_result2.success)
                 # no need to put the cubes to the goal because only one cube is moved. No unpredicted collision
                 goal_ik_result1 = self.ik_solve_single(default_ee_pos1, goal2, angle1, angle2)
                 goal_ik_result2 = self.ik_solve_single(goal1, default_ee_pos2, angle1, angle2)
+                print("goal_ik_result1 = ", goal_ik_result1.success, "goal_ik_result2 = ", goal_ik_result2.success)
                 if start_ik_result1.success and start_ik_result2.success and goal_ik_result1.success and goal_ik_result2.success:
                     task_plan.arm1_assigned_object = indices[0]
                     task_plan.arm2_assigned_object = indices[1]

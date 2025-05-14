@@ -49,12 +49,13 @@ if __name__ == "__main__":
     
     if args.method == "baseline":
         baseline = Baseline(task, headless=False, display=False)
-        plan = baseline.plan(use_our_tp=False)
+        plan = baseline.plan(use_our_tp=False, use_our_mp=False)
         # baseline.play(plan)
     elif args.method == "baseline_with_our_tp":
         baseline = Baseline(task, headless=False, display=False)
         plan = baseline.plan(use_our_tp=True, use_our_mp=False)
     elif args.method == "ours_with_baseline_tp":
+        print("Using baseline tp + our mp")
         baseline = Baseline(task, headless=True, display=True)
         plan = baseline.plan(use_our_tp=False, use_our_mp=True)
     else:

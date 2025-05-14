@@ -17,14 +17,20 @@ from task import Task, GripperAction, TaskPlan
 
 class Baseline(DualArmEnv):
     def __init__(self, task: Task, headless=True, display=False):
-        self.headless = headless
+        self.headless_baseline = headless
         super().__init__(task, headless=not display, batch_size = 3, constrain_grasp_approach=False)
     
-    @staticmethod
-    def convert_to_task_planner_space(pos):
-        pos = 1000 * pos/0.6 + 500
+    def convert_to_baseline_task_planner_space(self, pos):
+        pos = 1000 * pos/self.task.map_width + 500
         pos = pos.tolist()[:2]
         return pos
+    
+    def convert_to_motion_planner_space(self, pos):
+        res = np.zeros(3)
+        res[0] = (pos[0] - 500) * self.task.map_width / 1000
+        res[1] = (pos[1] - 500) * self.task.map_width / 1000
+        res[2] = self.task.object_size/2
+        return res
 
     def prepare_input(self):
         starts = self.task.get_original_starts().copy()
@@ -32,8 +38,8 @@ class Baseline(DualArmEnv):
         start_arr = {}
         goal_arr = {}
         for i in range(len(starts)):
-            start_arr[i] = self.convert_to_task_planner_space(starts[i])
-            goal_arr[i] = self.convert_to_task_planner_space(goals[i])
+            start_arr[i] = self.convert_to_baseline_task_planner_space(starts[i])
+            goal_arr[i] = self.convert_to_baseline_task_planner_space(goals[i])
         return start_arr, goal_arr
     
     def plan_all(self):
@@ -47,8 +53,8 @@ class Baseline(DualArmEnv):
                 start = start_arr[plan.arm1_assigned_object]
                 goal = goal_arr[plan.arm1_assigned_object] 
                 if plan.buffer is not None and plan.buffer[1] is not None:
-                    goal = self.convert_to_task_planner_space(plan.buffer[1])
-                    start_arr[plan.arm1_assigned_object] = self.convert_to_task_planner_space(plan.buffer[1])
+                    goal = self.convert_to_baseline_task_planner_space(plan.buffer[1])
+                    start_arr[plan.arm1_assigned_object] = self.convert_to_baseline_task_planner_space(plan.buffer[1])
                 action_list[0].append((
                     plan.arm1_assigned_object,
                     start,
@@ -60,8 +66,8 @@ class Baseline(DualArmEnv):
                 start = start_arr[plan.arm2_assigned_object]
                 goal = goal_arr[plan.arm2_assigned_object] 
                 if plan.buffer is not None and plan.buffer[2] is not None:
-                    goal = self.convert_to_task_planner_space(plan.buffer[2])
-                    start_arr[plan.arm2_assigned_object] = self.convert_to_task_planner_space(plan.buffer[2])
+                    goal = self.convert_to_baseline_task_planner_space(plan.buffer[2])
+                    start_arr[plan.arm2_assigned_object] = self.convert_to_baseline_task_planner_space(plan.buffer[2])
                 action_list[1].append((
                     plan.arm2_assigned_object,
                     start,
@@ -74,7 +80,7 @@ class Baseline(DualArmEnv):
 
 
 
-    @timeout_decorator.timeout(300)
+    @timeout_decorator.timeout(1000)
     def plan(self, use_our_tp=False, use_our_mp=False):
         self.reset()
         start_arr, goal_arr = self.prepare_input()
@@ -105,15 +111,16 @@ class Baseline(DualArmEnv):
         action_list = plan2schedule(action_list)
         if use_our_mp:
             self.motion_plan(action_list)
+            return self.recorded_plan
         else:
             result_dict, control = simulation(
                 Width, Height,start_arr, goal_arr, size, action_list, 
                 overlap_rate = 1.0, speed=speed, 
                 time_step_size=time_step_size, control_mode=control_mode, 
-                gui=not self.headless, method=method, debug = False)
+                gui=not self.headless_baseline, method=method, debug = False)
             recorded_plan = result_dict['recorded_plan']
             recorded_plan = self.post_process(recorded_plan)
-        return recorded_plan
+            return recorded_plan
     
     def post_process(self, recorded_plan):
         plan = []
@@ -184,9 +191,9 @@ class Baseline(DualArmEnv):
                 arm2_object = None
 
             task_plan_to_start = TaskPlan(
-                start_goal_pairs=[(arm1_object, arm2_object)],
-                arm1_assigned_object=arm1_object,
-                arm2_assigned_object=arm2_object,
+                start_goal_pairs=None if (arm1_object is None or arm2_object is None) else [(arm1_object, arm2_object)],
+                arm1_assigned_object=arm1_object if arm1_object is not None else None,
+                arm2_assigned_object=arm2_object if arm1_object is not None else None,
                 arm1_gripper_action=GripperAction.CLOSE,
                 arm2_gripper_action=GripperAction.CLOSE,
                 arm1_to_start=True,
@@ -196,15 +203,16 @@ class Baseline(DualArmEnv):
             )
             task_plan_to_start = super().filter_task_plans(task_plan_to_start)
             # place the object in the goal
-            super().motion_plan(task_plan_to_start)
+            task_execution_result = super().motion_plan(task_plan_to_start)
+            self.task.update(task_execution_result)
         
-            self.task.buffer_dict[i] = action_list[0][i][4]
-            self.task.buffer_dict[i] = action_list[1][i][4]
+            self.task.buffer_dict[arm1_object] = self.convert_to_motion_planner_space(action_list[0][i][4])
+            self.task.buffer_dict[arm2_object] = self.convert_to_motion_planner_space(action_list[1][i][4])
 
             task_plan_to_goal = TaskPlan(
-                start_goal_pairs=None,
-                arm1_assigned_object=arm1_object,
-                arm2_assigned_object=arm2_object,
+                start_goal_pairs=None if (arm1_object is None or arm2_object is None) else [(arm1_object, arm2_object)],
+                arm1_assigned_object=arm1_object if arm1_object is not None else arm2_object,
+                arm2_assigned_object=arm2_object if arm1_object is not None else None,
                 arm1_gripper_action=GripperAction.OPEN,
                 arm2_gripper_action=GripperAction.OPEN,
                 arm1_angle = task_plan_to_start.arm1_angle,
@@ -215,7 +223,8 @@ class Baseline(DualArmEnv):
                 use_buffer=False,
             )
 
-            super().motion_plan(task_plan_to_goal)
+            task_execution_result = super().motion_plan(task_plan_to_goal)
+            self.task.update(task_execution_result)
         
         return self.recorded_plan
 
