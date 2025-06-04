@@ -1019,7 +1019,7 @@ class Task:
             self.arm1_state.assigned_object = None
             self.arm1_state.gripper_state = result.arm1_gripper_state
             self.arm1_state.angle = None
-            if result.arm1_assigned_object != -1:
+            if result.arm1_assigned_object != -1 and result.arm1_assigned_object is not None:
                 if self.buffer_dict[result.arm1_assigned_object] is not None:
                     self.starts[result.arm1_assigned_object] = self.buffer_dict[result.arm1_assigned_object]
                     self.buffer_dict[result.arm1_assigned_object] = None
@@ -1037,7 +1037,7 @@ class Task:
             self.arm2_state.assigned_object = None
             self.arm2_state.gripper_state = result.arm2_gripper_state
             self.arm2_state.angle = None
-            if result.arm2_assigned_object != -1:
+            if result.arm2_assigned_object != -1 and result.arm2_assigned_object is not None:
                 if self.buffer_dict[result.arm2_assigned_object] is not None:
                     self.starts[result.arm2_assigned_object] = self.buffer_dict[result.arm2_assigned_object]
                     self.buffer_dict[result.arm2_assigned_object] = None

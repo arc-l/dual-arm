@@ -199,15 +199,20 @@ class Baseline(DualArmEnv):
                 arm1_to_start=True,
                 arm2_to_start=True,
                 buffer=None,
-                use_buffer=False
+                use_buffer=False,
+                arm1_angle=900 if arm1_object is None else None,
+                arm2_angle=900 if arm2_object is None else None
             )
             task_plan_to_start = super().filter_task_plans(task_plan_to_start)
             # place the object in the goal
+            self.old_task_plan = task_plan_to_start
             task_execution_result = super().motion_plan(task_plan_to_start)
             self.task.update(task_execution_result)
         
-            self.task.buffer_dict[arm1_object] = self.convert_to_motion_planner_space(action_list[0][i][4])
-            self.task.buffer_dict[arm2_object] = self.convert_to_motion_planner_space(action_list[1][i][4])
+            if arm1_object is not None:
+                self.task.buffer_dict[arm1_object] = self.convert_to_motion_planner_space(action_list[0][i][4])
+            if arm2_object is not None:
+                self.task.buffer_dict[arm2_object] = self.convert_to_motion_planner_space(action_list[1][i][4])
 
             task_plan_to_goal = TaskPlan(
                 start_goal_pairs=None if (arm1_object is None or arm2_object is None) else [(arm1_object, arm2_object)],
@@ -222,7 +227,7 @@ class Baseline(DualArmEnv):
                 buffer=None,
                 use_buffer=False,
             )
-
+            self.old_task_plan = task_plan_to_goal
             task_execution_result = super().motion_plan(task_plan_to_goal)
             self.task.update(task_execution_result)
         
