@@ -1108,8 +1108,6 @@ class DualArmEnv:
     def put_cubes_to_goal_to_solve_ik(self, ids: List[int]):
         #TODO: comeback here
         cuboids = []
-        if self.old_task_plan is None:
-            return
         for i in range(self.task.num_objects):
             cube_curobo = self.objects_curobo[i]
             if i in ids:
@@ -1129,8 +1127,6 @@ class DualArmEnv:
     
     def restore_ik_solver(self):
         cuboids = []
-        if self.old_task_plan is None:
-            return
         for i in range(self.task.num_objects):
             cube_curobo = self.objects_curobo[i]
             p = self.task.get_start(i)
@@ -1153,9 +1149,12 @@ class DualArmEnv:
                 start1, goal1, start2, goal2 = self.task.get_start( indices[0] ), self.task.get_goal( indices[0] ), self.task.get_start( indices[1] ), self.task.get_goal( indices[1] )
                 angle1, angle2 = combo
                 start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
+                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
                 self.put_cubes_to_goal_to_solve_ik(indices)
+                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
                 goal_ik_result = self.ik_solve_single(goal1, goal2, angle1, angle2)
                 self.restore_ik_solver()
+                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
                 if start_ik_result.success and goal_ik_result.success:
                     # [start_pos, goal_pos, orientation]
                     task_plan.arm1_assigned_object = indices[0]
@@ -1171,8 +1170,10 @@ class DualArmEnv:
                 angle1, angle2 = combo
                 start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
                 self.put_cubes_to_goal_to_solve_ik(indices)
+                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
                 goal_ik_result = self.ik_solve_single(goal1, goal2, angle1, angle2)
                 self.restore_ik_solver()
+                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
                 if start_ik_result.success and goal_ik_result.success:
                     # [start_pos, goal_pos, orientation]
                     task_plan.arm1_assigned_object = indices[0]
@@ -1191,9 +1192,12 @@ class DualArmEnv:
                 start_ik_result1 = self.ik_solve_single(default_ee_pos1, start2, angle1, angle2)
                 start_ik_result2 = self.ik_solve_single(start1, default_ee_pos2, angle1, angle2)
                 print("start_ik_result1 = ", start_ik_result1.success, "start_ik_result2 = ", start_ik_result2.success)
-                # no need to put the cubes to the goal because only one cube is moved. No unpredicted collision
+                self.put_cubes_to_goal_to_solve_ik(indices)
+                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
                 goal_ik_result1 = self.ik_solve_single(default_ee_pos1, goal2, angle1, angle2)
                 goal_ik_result2 = self.ik_solve_single(goal1, default_ee_pos2, angle1, angle2)
+                self.restore_ik_solver()
+                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
                 print("goal_ik_result1 = ", goal_ik_result1.success, "goal_ik_result2 = ", goal_ik_result2.success)
                 if start_ik_result1.success and start_ik_result2.success and goal_ik_result1.success and goal_ik_result2.success:
                     task_plan.arm1_assigned_object = indices[0]
@@ -1473,13 +1477,15 @@ class DualArmEnv:
         self.ik_solver.update_world(self.world_cfg_curobo)
         # print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
     
-    def save_scene_as_mesh(self):
-        mesh = self.single_motion_gen.world_coll_checker.get_mesh_in_bounding_box(
+    def save_scene_as_mesh(self, world_coll_checker=None, path: str = "scene.obj"):
+        if world_coll_checker is None:
+            world_coll_checker = self.single_motion_gen.world_coll_checker
+        mesh = world_coll_checker.get_mesh_in_bounding_box(
             cuboid=Cuboid(name="test", dims=[2,2,2], pose=[0, 0, -0.1,1,0,0,0]),
             voxel_size=0.01,
             run_marching_cubes=True
         )
-        mesh.save_as_mesh(file_path="results/scene.obj")
+        mesh.save_as_mesh(file_path=path)
 
     def interpolate_joint_states(self, start_joints, end_joints):
         """

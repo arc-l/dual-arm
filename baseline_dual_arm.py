@@ -205,8 +205,8 @@ class Baseline(DualArmEnv):
             )
             task_plan_to_start = super().filter_task_plans(task_plan_to_start)
             # place the object in the goal
-            self.old_task_plan = task_plan_to_start
             task_execution_result = super().motion_plan(task_plan_to_start)
+            self.old_task_plan = task_plan_to_start
             self.task.update(task_execution_result)
         
             if arm1_object is not None:
@@ -227,8 +227,8 @@ class Baseline(DualArmEnv):
                 buffer=None,
                 use_buffer=False,
             )
-            self.old_task_plan = task_plan_to_goal
             task_execution_result = super().motion_plan(task_plan_to_goal)
+            self.old_task_plan = task_plan_to_goal
             self.task.update(task_execution_result)
         
         return self.recorded_plan
