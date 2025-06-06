@@ -5,6 +5,7 @@ import numpy as np
 data_folder = "data"
 results_folder = "results"
 execution_times_by_type = {}
+ignore_baseline_for_double_cycled = True
 
 # Define fixed order of testcase types
 testcase_types_order = ["mixed", "cycled", "double_cycled", "random"]
@@ -42,7 +43,8 @@ for filename in os.listdir(data_folder):
 
         exec_time = 0.0
         if not os.path.exists(duration_path):
-            print(f"[Missing {method}] {duration_file}")
+            if not (testcase_name.startswith("double_cycled") and method == "baseline"):
+                print(f"[Missing {method}] {duration_file}")
         else:
             try:
                 with open(duration_path, "r") as f:
@@ -50,7 +52,11 @@ for filename in os.listdir(data_folder):
             except ValueError:
                 print(f"[Parse error {method}] {duration_file}")
 
-        result_entry[method] = exec_time
+        if ignore_baseline_for_double_cycled and testcase_name.startswith("double_cycled") and method == "baseline":
+            result_entry[method] = 0
+        else:
+            result_entry[method] = exec_time
+
 
     if testcase_type not in execution_times_by_type:
         execution_times_by_type[testcase_type] = []
@@ -72,9 +78,10 @@ width = 0.2
 
 # Bar positions
 baseline_x = x - 1.5 * width
-ours_x = x - 0.5 * width
-tp_x = x + 0.5 * width
-ours_tp_x = x + 1.5 * width
+tp_x = x - 0.5 * width
+ours_tp_x = x + 0.5 * width
+ours_x = x + 1.5 * width
+
 
 # Get times
 baseline_times = [case["baseline"] for case in sorted_cases]
@@ -86,8 +93,8 @@ ours_tp_times = [case["ours_with_baseline_tp"] for case in sorted_cases]
 fig, ax = plt.subplots(figsize=(16, 6))
 ax.bar(baseline_x, baseline_times, width, label="Baseline", color=colors["baseline"])
 ax.bar(tp_x, tp_times, width, label="Baseline w/ Our TP", color=colors["baseline_with_our_tp"])
-ax.bar(ours_x, ours_times, width, label="Ours", color=colors["ours"])
 ax.bar(ours_tp_x, ours_tp_times, width, label="Ours w/ Baseline TP", color=colors["ours_with_baseline_tp"])
+ax.bar(ours_x, ours_times, width, label="Ours", color=colors["ours"])
 
 ax.set_xlabel("Test Cases")
 ax.set_ylabel("Execution Time (s)")
@@ -98,4 +105,4 @@ ax.legend()
 plt.tight_layout()
 plt.savefig("results/execution_time_comparison.png", dpi=500)
 print("Plot saved as results/execution_time_comparison.png")
-plt.show()
+# plt.show()
