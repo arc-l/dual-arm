@@ -32,6 +32,8 @@ from curobo.util.logger import setup_curobo_logger
 from curobo.util_file import get_robot_configs_path, get_world_configs_path, join_path, load_yaml
 from curobo.wrap.reacher.motion_gen import MotionGen, MotionGenConfig, MotionGenPlanConfig, MotionGenResult, PoseCostMetric
 from curobo.wrap.reacher.ik_solver import IKSolver, IKSolverConfig
+from curobo.geom.sdf.world import CollisionQueryBuffer
+from curobo.wrap.model.robot_world import RobotWorld, RobotWorldConfig
 
 
 # toppra
@@ -63,7 +65,8 @@ class DualArmEnv:
 
         setup_curobo_logger("warn")
         self.tensor_args = TensorDeviceType()
-        self.robot_cfg = load_yaml(join_path(get_robot_configs_path(), "dual_ur5e_gripper.yml"))["robot_cfg"]
+        self.robot_path = join_path(get_robot_configs_path(), "dual_ur5e_gripper.yml")
+        self.robot_cfg = load_yaml(self.robot_path)["robot_cfg"]
         gripper_cfg = load_yaml(join_path(get_robot_configs_path(), "gripper/dual_ur5e_gripper.yml"))["gripper_cfg"]
         self.gripper_joint_names = gripper_cfg["gripper_joint_names"]
         self.gripper_grasp_orientations = gripper_cfg["grasp_orientation"]
@@ -180,6 +183,16 @@ class DualArmEnv:
             num_ik_seeds=200,
             # fail_on_invalid_query=False,
         )
+
+        self.robot_world_cfg = RobotWorldConfig.load_from_config(
+            self.robot_cfg,
+            self.world_cfg_curobo,
+            collision_activation_distance=0.0,
+            self_collision_activation_distance=0.0,
+            collision_checker_type= CollisionCheckerType.PRIMITIVE,
+            tensor_args= self.tensor_args
+        )
+        self.robot_world = RobotWorld(self.robot_world_cfg)
 
         self.gripper_joint_indices = []
 
@@ -754,7 +767,7 @@ class DualArmEnv:
                 # go down
                 arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
                 arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
-                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
                 self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
@@ -762,7 +775,7 @@ class DualArmEnv:
                 # go up
                 arm1_delta_z = self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
                 arm2_delta_z = self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
-                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
             else:
@@ -790,7 +803,7 @@ class DualArmEnv:
                 # go down
                 arm1_delta_z = 0
                 arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
-                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
 
@@ -799,7 +812,7 @@ class DualArmEnv:
                 # go up
                 arm1_delta_z = 0
                 arm2_delta_z = self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
-                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
 
@@ -817,7 +830,7 @@ class DualArmEnv:
                 # go down
                 arm2_delta_z = 0
                 arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
-                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
 
@@ -826,7 +839,7 @@ class DualArmEnv:
                 # go up
                 arm2_delta_z = 0
                 arm1_delta_z = self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
-                cmd_plan = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+                cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
 
@@ -869,7 +882,7 @@ class DualArmEnv:
                     case -450:
                         pos2[1] = max(pos2[1] - 0.3, -0.3)
                 
-                cmd_plan = self.move_ee(pos1, self.old_task_plan.arm1_angle, pos2, self.old_task_plan.arm2_angle)
+                cmd_plan, valid = self.move_ee(pos1, self.old_task_plan.arm1_angle, pos2, self.old_task_plan.arm2_angle)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
 
@@ -880,7 +893,7 @@ class DualArmEnv:
                 delta_y = 0.3 
                 pos1[1] = min(pos1[1] + delta_y, 0.3)
                 pos2[1] = max(pos2[1] - delta_y, -0.3)
-                cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+                cmd_plan, valid = self.move_ee(pos1, angle1, pos2, angle2)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
                 # cmd_plan_total = cmd_plan_total.stack(cmd_plan)
@@ -889,7 +902,7 @@ class DualArmEnv:
                 delta_y = 0.3 
                 pos1[1] = max(pos1[1] - delta_y, -0.3)
                 pos2[1] = min(pos2[1] + delta_y, 0.3)
-                cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+                cmd_plan, valid = self.move_ee(pos1, angle1, pos2, angle2)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
             
@@ -898,7 +911,7 @@ class DualArmEnv:
             delta_x = 0.3
             pos1[0] = max(pos1[0]-delta_x, -0.3)
             pos2[0] = min(pos1[0]+delta_x, 0.3)
-            cmd_plan = self.move_ee(pos1, angle1, pos2, angle2)
+            cmd_plan, valid = self.move_ee(pos1, angle1, pos2, angle2)
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
         
@@ -930,7 +943,7 @@ class DualArmEnv:
                     pos2[1] = max(min(goal_arm2[1] - 0.3, self.get_current_ee_pos()[self.arm2][1]-0.3), -0.3)
 
             if not (new_angle1 == old_angle1 and new_angle2 == old_angle2):
-                cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
+                cmd_plan, valid = self.move_ee(pos1, new_angle1, pos2, new_angle2)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
             
@@ -944,7 +957,7 @@ class DualArmEnv:
             else:
                 pos2[1] = goal_arm2[1]
             
-            cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
+            cmd_plan, valid = self.move_ee(pos1, new_angle1, pos2, new_angle2)
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
 
@@ -952,7 +965,7 @@ class DualArmEnv:
             pos1[1] = goal_arm1[1]
             pos2[1] = goal_arm2[1]
 
-            cmd_plan = self.move_ee(pos1, new_angle1, pos2, new_angle2)
+            cmd_plan, valid = self.move_ee(pos1, new_angle1, pos2, new_angle2)
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
     
@@ -1519,6 +1532,25 @@ class DualArmEnv:
         targetPositions=joints,
         positionGains=[0.05] * len(self.arm_joints_id_bullet),
         )
+    
+    def traj_collision_check(self, traj: JointState):
+        traj = traj.get_ordered_joint_state(self.arm_joint_names)
+        positions = traj.position
+        positions = positions.unsqueeze(0)
+        d_world, d_self = self.robot_world.get_world_self_collision_distance_from_joint_trajectory(
+            positions
+        )
+        valid = d_self.max() <= 0
+        if not valid:
+            print(f"Collision detected in trajectory with max distance {d_self.max().item()}")
+        return valid
+        # for i in range(traj.shape[0]):
+        #     valid, status = self.single_motion_gen.check_start_state(traj[i])
+        #     if not valid:
+        #         print(f"Collision detected in trajectory at step {i} with status: {status}")
+        #         return False
+        # return True 
+
         
     def move_ee(self, pos1, angle1, pos2, angle2):
         ik_result = self.ik_solve_single(pos1, pos2, angle1, angle2, num_solutions=1)
@@ -1530,7 +1562,9 @@ class DualArmEnv:
         goal_js = ik_result.js_solution.get_ordered_joint_state(self.j_names_primary).position.squeeze(0).view(-1)
         traj = self.interpolate_joint_states(curr_js.position, goal_js)
         cmd_plan = JointState.from_position(traj, self.j_names_primary)
-        return cmd_plan
+        valid = self.traj_collision_check(cmd_plan)
+        print(f"move_ee: valid = {valid}")
+        return cmd_plan, valid
     
     def move_z(self, delta, angle1, angle2):
         ee_pos = self.get_current_ee_pos()

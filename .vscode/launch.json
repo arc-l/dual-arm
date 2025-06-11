@@ -30,10 +30,10 @@
             "args": [
                 "--input",
                 // "data/task_2_cycle.json",
-                "data/random_objects_16.json",
+                // "data/random_objects_16.json",
                 // "data/mixed_2.json",
                 // "data/random_objects_13.json",
-                // "data/cycled_objects_9.json",
+                "data/cycled_objects_7.json",
                 // "data/double_cycled_6.json",
                 "--method",
                 // "ours"
