@@ -12,7 +12,7 @@ def parse_arguments():
     
     parser.add_argument(
         "--method",
-        choices=["baseline", "ours", "baseline_with_our_tp", "ours_with_baseline_tp"],
+        choices=["baseline", "ours", "baseline_with_our_tp", "ours_with_baseline_tp",  "our_tp_with_curobo"],
         required=True,
         help="Specify the method to use: 'baseline' or 'ours'."
     )
@@ -58,10 +58,17 @@ if __name__ == "__main__":
         print("Using baseline tp + our mp")
         baseline = Baseline(task, headless=True, display=True)
         plan = baseline.plan(use_our_tp=False, use_our_mp=True)
+    elif args.method == "our_tp_with_curobo":
+        dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, num_buffers=20, pure_curobo=True)
+        plan = dual_arm_env.plan()
     else:
         # Call our method
-        dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, constrain_grasp_approach=False, num_buffers=20)
+        dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, num_buffers=20, pure_curobo=False)
         plan = dual_arm_env.plan()
+
+    if plan is None:
+        print("No plan found.")
+        exit(1)
 
     duration = get_duration(plan)
     print("Plan duration:", duration)

@@ -55,13 +55,14 @@ class DualArmEnv:
                  task: Task,
                  headless: bool = False,
                  batch_size: int = 3,
-                 constrain_grasp_approach: bool = False,
                  num_buffers: int = 20,
+                 pure_curobo: bool = False,
                  ):
         self.headless = headless
         self.task = task
         self.num_buffers = num_buffers
         self.spheres = None
+        self.pure_curobo = pure_curobo
 
         setup_curobo_logger("warn")
         self.tensor_args = TensorDeviceType()
@@ -160,10 +161,6 @@ class DualArmEnv:
         print("Curobo is Ready")
         
         pose_metric = None
-        if constrain_grasp_approach:
-            pose_metric = PoseCostMetric.create_grasp_approach_metric(
-                offset_position=0.2, tstep_fraction=0.8
-            )
         self.plan_config = MotionGenPlanConfig(
             enable_graph=False,
             enable_graph_attempt=4,
@@ -730,7 +727,7 @@ class DualArmEnv:
         return task_execution_result
 
     def motion_plan(self, task_plan: TaskPlan):
-        needs_naive_plan = True #TODO: Remove this later
+        needs_naive_plan = True if not self.pure_curobo else False #TODO: Remove this later
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
         else:
@@ -748,10 +745,17 @@ class DualArmEnv:
 
         if task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object is not None and not needs_naive_plan:
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
+            cmd_plan = self.get_plan_single(result)
+            cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
+            self.visualize_plan(cmd_plan)
+            self.add_plan_to_record(cmd_plan)
+            self.go_down_go_up(task_plan)
             if not result.success:
                 print("Failed to go to start position, using naive waypoints")
-                needs_naive_plan = True
+                needs_naive_plan = True if not self.pure_curobo else False #TODO: Remove this later
                 self.check_object_collision_enabled()
+                if self.pure_curobo:
+                    return None 
             else:
                 print("Going to the start position")
                 cmd_plan = self.get_plan_single(result)
@@ -764,20 +768,7 @@ class DualArmEnv:
                 cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
-                # go down
-                arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
-                arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
-                cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
-                self.visualize_plan(cmd_plan)
-                self.add_plan_to_record(cmd_plan)
-                self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
-                self.add_plan_to_record([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
-                # go up
-                arm1_delta_z = self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
-                arm2_delta_z = self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
-                cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
-                self.visualize_plan(cmd_plan)
-                self.add_plan_to_record(cmd_plan)
+                self.go_down_go_up(task_plan)
             else:
                 # one arm by one arm
                 # if the arms are going to the start positions, recalculate the angles since if we do it with one are, there might be simpler solutions
@@ -1001,6 +992,9 @@ class DualArmEnv:
         while not self.task.finished():
             task_plan = self.task_plan()
             task_execution_result = self.motion_plan(task_plan)
+            if task_execution_result is None:
+                print("Motion planning failed.")
+                return None
             self.old_task_plan = task_plan
             idx_to_sync = list(range(self.task.num_objects))
             sync_after_open = False
@@ -1551,6 +1545,21 @@ class DualArmEnv:
         #         return False
         # return True 
 
+    def go_down_go_up(self, task_plan: TaskPlan):
+        # go down
+        arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
+        arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+        cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+        self.visualize_plan(cmd_plan)
+        self.add_plan_to_record(cmd_plan)
+        self.gripper_control(task_plan.arm1_gripper_action, task_plan.arm2_gripper_action)
+        self.add_plan_to_record([task_plan.arm1_gripper_action, task_plan.arm2_gripper_action])
+        # go up
+        arm1_delta_z = self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
+        arm2_delta_z = self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
+        cmd_plan, valid = self.move_z_2(arm1_delta_z, arm2_delta_z, task_plan.arm1_angle, task_plan.arm2_angle)
+        self.visualize_plan(cmd_plan)
+        self.add_plan_to_record(cmd_plan)
         
     def move_ee(self, pos1, angle1, pos2, angle2):
         ik_result = self.ik_solve_single(pos1, pos2, angle1, angle2, num_solutions=1)

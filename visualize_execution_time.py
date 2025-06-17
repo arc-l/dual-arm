@@ -9,12 +9,13 @@ ignore_baseline_for_double_cycled = True
 
 # Define fixed order of testcase types
 testcase_types_order = ["mixed", "cycled", "double_cycled", "random"]
-methods = ["ours", "baseline", "baseline_with_our_tp", "ours_with_baseline_tp"]
+methods = ["ours", "baseline", "baseline_with_our_tp", "ours_with_baseline_tp", "our_tp_with_curobo"]
 colors = {
     "baseline": "gray",
     "ours": "blue",
     "baseline_with_our_tp": "green",
     "ours_with_baseline_tp": "orange",
+    "our_tp_with_curobo": "purple",
 }
 
 # Helper to extract number of objects from testcase name
@@ -73,28 +74,35 @@ for t_type in testcase_types_order:
 
 # Step 3: Prepare data for plotting
 testcase_names = [case["name"] for case in sorted_cases]
-x = np.arange(len(testcase_names))
+group_spacing = 1.2  # or try 1.5 for even more spacing
+x = np.arange(len(testcase_names)) * group_spacing
 width = 0.2
 
 # Bar positions
-baseline_x = x - 1.5 * width
-tp_x = x - 0.5 * width
-ours_tp_x = x + 0.5 * width
-ours_x = x + 1.5 * width
+baseline_x = x - 2 * width
+tp_x = x - width
+ours_tp_x = x
+our_tp_with_curobo_x = x + width
+ours_x = x + 2 * width
+
 
 
 # Get times
 baseline_times = [case["baseline"] for case in sorted_cases]
-ours_times = [case["ours"] for case in sorted_cases]
 tp_times = [case["baseline_with_our_tp"] for case in sorted_cases]
 ours_tp_times = [case["ours_with_baseline_tp"] for case in sorted_cases]
+our_tp_with_curobo_times = [case["our_tp_with_curobo"] for case in sorted_cases]
+ours_times = [case["ours"] for case in sorted_cases]
+
 
 # Step 4: Plot
-fig, ax = plt.subplots(figsize=(16, 6))
+fig, ax = plt.subplots(figsize=(18, 6))
 ax.bar(baseline_x, baseline_times, width, label="Baseline", color=colors["baseline"])
 ax.bar(tp_x, tp_times, width, label="Baseline w/ Our TP", color=colors["baseline_with_our_tp"])
 ax.bar(ours_tp_x, ours_tp_times, width, label="Ours w/ Baseline TP", color=colors["ours_with_baseline_tp"])
+ax.bar(our_tp_with_curobo_x, our_tp_with_curobo_times, width, label="Our TP w/ Curobo", color=colors["our_tp_with_curobo"])
 ax.bar(ours_x, ours_times, width, label="Ours", color=colors["ours"])
+
 
 ax.set_xlabel("Test Cases")
 ax.set_ylabel("Execution Time (s)")
