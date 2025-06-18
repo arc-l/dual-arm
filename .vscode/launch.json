@@ -30,17 +30,17 @@
             "args": [
                 "--input",
                 // "data/task_2_cycle.json",
-                "data/random_objects_10.json",
-                // "data/mixed_2.json",
+                // "data/random_objects_4.json",
+                "data/mixed_10.json",
                 // "data/random_objects_13.json",
                 // "data/cycled_objects_7.json",
                 // "data/double_cycled_6.json",
                 "--method",
-                // "ours"
+                "ours"
                 // "baseline"
                 // "baseline_with_our_tp"
                 // "ours_with_baseline_tp"
-                "our_tp_with_curobo"
+                // "our_tp_with_curobo"
             ]
         },
         {
@@ -54,8 +54,8 @@
                 // "data/cycled_objects_7.json",
                 // "data/random_objects_18.json",
                 // "data/random_objects_4.json",
-                "data/double_cycled_9.json",
-                // "data/mixed_3.json",
+                // "data/double_cycled_9.json",
+                // "data/mixed_10.json",
                 "--method",
                 // "ours"
                 // "baseline"

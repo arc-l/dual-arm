@@ -727,7 +727,7 @@ class DualArmEnv:
         return task_execution_result
 
     def motion_plan(self, task_plan: TaskPlan):
-        needs_naive_plan = True if not self.pure_curobo else False #TODO: Remove this later
+        needs_naive_plan = False
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
         else:
@@ -745,20 +745,19 @@ class DualArmEnv:
 
         if task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object is not None and not needs_naive_plan:
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
-            cmd_plan = self.get_plan_single(result)
-            cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
-            self.visualize_plan(cmd_plan)
-            self.add_plan_to_record(cmd_plan)
-            self.go_down_go_up(task_plan)
             if not result.success:
                 print("Failed to go to start position, using naive waypoints")
-                needs_naive_plan = True if not self.pure_curobo else False #TODO: Remove this later
+                needs_naive_plan = True if not self.pure_curobo else False 
                 self.check_object_collision_enabled()
                 if self.pure_curobo:
                     return None 
             else:
                 print("Going to the start position")
                 cmd_plan = self.get_plan_single(result)
+                cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
+                self.visualize_plan(cmd_plan)
+                self.add_plan_to_record(cmd_plan)
+                self.go_down_go_up(task_plan)
 
         if needs_naive_plan:
             self.naive_motion_plan(task_plan)
@@ -1156,12 +1155,12 @@ class DualArmEnv:
                 start1, goal1, start2, goal2 = self.task.get_start( indices[0] ), self.task.get_goal( indices[0] ), self.task.get_start( indices[1] ), self.task.get_goal( indices[1] )
                 angle1, angle2 = combo
                 start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
-                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
+                # self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
                 self.put_cubes_to_goal_to_solve_ik(indices)
-                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
+                # self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
                 goal_ik_result = self.ik_solve_single(goal1, goal2, angle1, angle2)
                 self.restore_ik_solver()
-                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
+                # self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
                 if start_ik_result.success and goal_ik_result.success:
                     # [start_pos, goal_pos, orientation]
                     task_plan.arm1_assigned_object = indices[0]
@@ -1177,10 +1176,10 @@ class DualArmEnv:
                 angle1, angle2 = combo
                 start_ik_result = self.ik_solve_single(start1, start2, angle1, angle2)
                 self.put_cubes_to_goal_to_solve_ik(indices)
-                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
+                # self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
                 goal_ik_result = self.ik_solve_single(goal1, goal2, angle1, angle2)
                 self.restore_ik_solver()
-                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
+                # self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
                 if start_ik_result.success and goal_ik_result.success:
                     # [start_pos, goal_pos, orientation]
                     task_plan.arm1_assigned_object = indices[0]
@@ -1200,11 +1199,11 @@ class DualArmEnv:
                 start_ik_result2 = self.ik_solve_single(start1, default_ee_pos2, angle1, angle2)
                 print("start_ik_result1 = ", start_ik_result1.success, "start_ik_result2 = ", start_ik_result2.success)
                 self.put_cubes_to_goal_to_solve_ik(indices)
-                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
+                # self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
                 goal_ik_result1 = self.ik_solve_single(default_ee_pos1, goal2, angle1, angle2)
                 goal_ik_result2 = self.ik_solve_single(goal1, default_ee_pos2, angle1, angle2)
                 self.restore_ik_solver()
-                self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
+                # self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
                 print("goal_ik_result1 = ", goal_ik_result1.success, "goal_ik_result2 = ", goal_ik_result2.success)
                 if start_ik_result1.success and start_ik_result2.success and goal_ik_result1.success and goal_ik_result2.success:
                     task_plan.arm1_assigned_object = indices[0]
