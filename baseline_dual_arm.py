@@ -18,7 +18,7 @@ from task import Task, GripperAction, TaskPlan
 class Baseline(DualArmEnv):
     def __init__(self, task: Task, headless=True, display=False):
         self.headless_baseline = headless
-        super().__init__(task, headless=not display, batch_size = 3, constrain_grasp_approach=False)
+        super().__init__(task, headless=not display, batch_size = 3)
     
     def convert_to_baseline_task_planner_space(self, pos):
         pos = 1000 * pos/self.task.map_width + 500
