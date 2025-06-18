@@ -760,7 +760,7 @@ class DualArmEnv:
                 self.go_down_go_up(task_plan)
 
         if needs_naive_plan:
-            self.naive_motion_plan(task_plan)
+            valid = self.naive_motion_plan(task_plan)
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
             if result.success:
                 cmd_plan = self.get_plan_single(result)
@@ -873,6 +873,8 @@ class DualArmEnv:
                         pos2[1] = max(pos2[1] - 0.3, -0.3)
                 
                 cmd_plan, valid = self.move_ee(pos1, self.old_task_plan.arm1_angle, pos2, self.old_task_plan.arm2_angle)
+                if not valid:
+                    return False
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
 
@@ -884,6 +886,8 @@ class DualArmEnv:
                 pos1[1] = min(pos1[1] + delta_y, 0.3)
                 pos2[1] = max(pos2[1] - delta_y, -0.3)
                 cmd_plan, valid = self.move_ee(pos1, angle1, pos2, angle2)
+                if not valid:
+                    return False
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
                 # cmd_plan_total = cmd_plan_total.stack(cmd_plan)
@@ -893,6 +897,8 @@ class DualArmEnv:
                 pos1[1] = max(pos1[1] - delta_y, -0.3)
                 pos2[1] = min(pos2[1] + delta_y, 0.3)
                 cmd_plan, valid = self.move_ee(pos1, angle1, pos2, angle2)
+                if not valid:
+                    return False
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
             
@@ -902,6 +908,8 @@ class DualArmEnv:
             pos1[0] = max(pos1[0]-delta_x, -0.3)
             pos2[0] = min(pos1[0]+delta_x, 0.3)
             cmd_plan, valid = self.move_ee(pos1, angle1, pos2, angle2)
+            if not valid:
+                return False
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
         
@@ -934,6 +942,8 @@ class DualArmEnv:
 
             if not (new_angle1 == old_angle1 and new_angle2 == old_angle2):
                 cmd_plan, valid = self.move_ee(pos1, new_angle1, pos2, new_angle2)
+                if not valid:
+                    return False
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
             
@@ -948,6 +958,8 @@ class DualArmEnv:
                 pos2[1] = goal_arm2[1]
             
             cmd_plan, valid = self.move_ee(pos1, new_angle1, pos2, new_angle2)
+            if not valid:
+                return False
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
 
@@ -956,8 +968,11 @@ class DualArmEnv:
             pos2[1] = goal_arm2[1]
 
             cmd_plan, valid = self.move_ee(pos1, new_angle1, pos2, new_angle2)
+            if not valid:
+                return False
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
+        return True
     
     def filter_task_plans(self, task_plan: TaskPlan):
         if task_plan.start_goal_pairs is not None and not task_plan.use_buffer:
@@ -1537,12 +1552,6 @@ class DualArmEnv:
         if not valid:
             print(f"Collision detected in trajectory with max distance {d_self.max().item()}")
         return valid
-        # for i in range(traj.shape[0]):
-        #     valid, status = self.single_motion_gen.check_start_state(traj[i])
-        #     if not valid:
-        #         print(f"Collision detected in trajectory at step {i} with status: {status}")
-        #         return False
-        # return True 
 
     def go_down_go_up(self, task_plan: TaskPlan):
         # go down

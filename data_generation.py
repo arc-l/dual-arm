@@ -100,30 +100,50 @@ def generate_mixed():
 
 if __name__ == "__main__":
     # clean up the readme file
-    readme_path = "README.md"
-    with open(readme_path, "r") as f:
-        content = f.read()
+    # readme_path = "README.md"
+    # with open(readme_path, "r") as f:
+    #     content = f.read()
     
-    # Remove everything after the comment
-    cleaned = re.split(r'<!--\s*Start\s*-->', content)[0] + "\n<!-- Start -->\n"
-    with open("README.md", "w") as f:
-        f.write(cleaned)
+    # # Remove everything after the comment
+    # cleaned = re.split(r'<!--\s*Start\s*-->', content)[0] + "\n<!-- Start -->\n"
+    # with open("README.md", "w") as f:
+    #     f.write(cleaned)
 
-    data_folder = "data"
-    data_vis_folder = "data_vis"
-    # debug the whole process
-    for folder in [data_folder, data_vis_folder]:
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        else:
-            # remove the folder and create it again
-            shutil.rmtree(folder)
-            os.makedirs(folder)
+    # data_folder = "data"
+    # data_vis_folder = "data_vis"
+    # # debug the whole process
+    # for folder in [data_folder, data_vis_folder]:
+    #     if not os.path.exists(folder):
+    #         os.makedirs(folder)
+    #     else:
+    #         # remove the folder and create it again
+    #         shutil.rmtree(folder)
+    #         os.makedirs(folder)
 
-    generate_random()
-    generate_cycled()
-    generate_double_cycled()
-    generate_mixed()
+    # generate_random()
+    # generate_cycled()
+    # generate_double_cycled()
+    # generate_mixed()
 
+
+    i=17
+    task = Task(i, table_size, table_size, object_size)
+    try:
+        task.generate(gen_type="random", clearance=0.2)
+    except Exception as e:
+        print("clearance 0.1 failed, trying clearance 0.1")
+        try:
+            task.generate(gen_type="random", clearance=0.1)
+        except Exception as e:
+            print("clearance 0.1 failed, trying clearance 0.05")
+            try:
+                task.generate(gen_type="random", clearance=0.05)
+            except Exception as e:
+                print("clearance 0.05 failed, trying clearance 0.0")
+                task.generate(gen_type="random", clearance=0.01)
+
+    task.write_to_json(f"data/random_objects_{i}.json")
+    task.draw_four_panel(f"data_vis/random_objects_{i}.png")
+    
 
 

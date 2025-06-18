@@ -114,3 +114,68 @@ plt.tight_layout()
 plt.savefig("results/execution_time_comparison.png", dpi=500)
 print("Plot saved as results/execution_time_comparison.png")
 # plt.show()
+
+# Step 5: Success Rate Plot
+total_cases = len(sorted_cases)
+success_counts = {method: 0 for method in methods}
+
+for case in sorted_cases:
+    for method in methods:
+        if ignore_baseline_for_double_cycled and case["name"].startswith("double_cycled") and method == "baseline":
+            continue  # don't penalize baseline for this
+        if case[method] > 0:  # treat >0 as success
+            success_counts[method] += 1
+
+success_rates = {method: success_counts[method] / total_cases for method in methods}
+
+# Plot success rate
+fig, ax = plt.subplots(figsize=(10, 5))
+bar_x = np.arange(len(methods))
+bar_heights = [success_rates[method] for method in methods]
+bar_colors = [colors[method] for method in methods]
+
+ax.bar(bar_x, bar_heights, color=bar_colors, tick_label=methods)
+ax.set_ylim(0, 1.05)
+ax.set_ylabel("Success Rate")
+ax.set_title("Success Rate by Method")
+
+# Annotate bar values
+for i, rate in enumerate(bar_heights):
+    ax.text(i, rate + 0.02, f"{rate:.2f}", ha='center', va='bottom')
+
+plt.tight_layout()
+plt.savefig("results/success_rate_comparison.png", dpi=500)
+print("Plot saved as results/success_rate_comparison.png")
+
+# Step 6: Execution Time Ratios vs Ours
+ratio_data = {method: [] for method in methods if method != "ours"}
+
+for case in sorted_cases:
+    ours_time = case["ours"]
+    if ours_time <= 0:
+        continue  # skip cases where ours failed
+
+    for method in ratio_data:
+        method_time = case[method]
+        if method_time > 0:
+            ratio = method_time / ours_time
+            ratio_data[method].append(ratio)
+
+# Box plot data
+labels = list(ratio_data.keys())
+data = [ratio_data[method] for method in labels]
+box_colors = [colors[method] for method in labels]
+
+fig, ax = plt.subplots(figsize=(10, 5))
+box = ax.boxplot(data, patch_artist=True, labels=labels)
+
+# Color each box
+for patch, color in zip(box['boxes'], box_colors):
+    patch.set_facecolor(color)
+
+ax.set_ylabel("Execution Time Ratio (Method / Ours)")
+ax.set_title("Execution Time Ratio Compared to Ours")
+plt.tight_layout()
+plt.savefig("results/execution_time_ratios_boxplot.png", dpi=500)
+print("Plot saved as results/execution_time_ratios_boxplot.png")
+# plt.show()
