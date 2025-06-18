@@ -173,6 +173,8 @@ box = ax.boxplot(data, patch_artist=True, labels=labels)
 for patch, color in zip(box['boxes'], box_colors):
     patch.set_facecolor(color)
 
+ax.axhline(y=1.0, color='red', linestyle='--', linewidth=1)
+
 ax.set_ylabel("Execution Time Ratio (Method / Ours)")
 ax.set_title("Execution Time Ratio Compared to Ours")
 plt.tight_layout()
