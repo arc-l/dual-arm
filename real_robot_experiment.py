@@ -36,24 +36,18 @@ def plan_process(plan):
             p:JointState = p
             positions = p.position.cpu().numpy()
             arm1_positions = positions[:, :6]
-            arm2_positions = positions[:, 6:12]
+            arm2_positions = positions[:, 6:]
             arm1_positions[:, 0] += np.pi/2  # Add pi/2 to the base joint
             arm2_positions[:, 0] += np.pi/2  # Add pi/2 to the base joint
             new_plan.append([arm1_positions, arm2_positions])
     return new_plan
-if __name__ == "__main__":
+
+def get_arrangement():
     camera = Camera(calibrated=True, on_hand=False)
     goals = update_cube_poses_real2sim(camera)
     print("goals:")
     print(goals)
     keys = sorted(list(goals.keys()))
-    # data = {
-    #     'goals': [goals[key].tolist() for key in keys],
-    #     "object_size": 0.038,
-    #     "map_width": 0.6,
-    #     "map_length": 0.6 }
-    # with open("data/real_robot_experiment_goals.json", 'w') as f:
-    #     json.dump(data, f, indent=4)
     input("Press Enter to record starts...")
     starts = update_cube_poses_real2sim(camera)
     print("starts:")
@@ -66,7 +60,9 @@ if __name__ == "__main__":
         "map_length": 0.6 }
     with open("data/real_robot_experiment.json", 'w') as f:
         json.dump(data, f, indent=4)
-        
+
+if __name__ == "__main__":
+    get_arrangement()
     task = Task.read_from_json("data/real_robot_experiment.json")
     dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, num_buffers=20, pure_curobo=False)
     plan = dual_arm_env.plan()

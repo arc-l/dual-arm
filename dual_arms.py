@@ -1051,8 +1051,39 @@ class DualArmEnv:
 
             self.check_object_collision_enabled()
             self.task.update(task_execution_result)
-        return self.recorded_plan
-    
+        plan = self.sanity_check()
+        return plan
+
+    def sanity_check(self):
+        last_position = None
+        plan = []
+        for section in self.recorded_plan:
+            if type(section[0]) == GripperAction:
+                plan.append(section)
+            else:
+                section_plan = section.get_ordered_joint_state(self.arm_joint_names)
+                plan.append(section_plan)
+                self.sanity_check_section(section_plan, last_position)
+                last_position = section_plan.position[-1].cpu().numpy()
+        return plan
+
+    def sanity_check_section(self, plan: JointState, last_position=None):
+        # check if one section of plan has too large deviation
+        if last_position is not None:
+            norm = np.linalg.norm(plan.position[0].cpu().numpy() - last_position)
+            if norm > 0.1:
+                print(f"Warning: Large deviation detected and last position with {norm}")
+                print(plan.position[0].cpu().numpy())
+                print(last_position)
+
+        for i in range(len(plan.position)-1):
+            norm = np.linalg.norm(plan.position[i].cpu().numpy() - plan.position[i+1].cpu().numpy())
+            if norm > 0.1:
+                print(f"Warning: Large deviation detected between section {i} and {i+1} with {norm}")
+                print(plan.position[i].cpu().numpy())
+                print(plan.position[i+1].cpu().numpy())
+        print("Sanity check complete")
+
     def plan_all(self)->List[TaskPlan]:
         self.reset()
         task_plans = []
