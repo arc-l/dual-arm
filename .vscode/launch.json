@@ -32,9 +32,10 @@
                 // "data/task_2_cycle.json",
                 // "data/random_objects_4.json",
                 // "data/mixed_5.json",
-                "data/random_objects_17.json",
+                // "data/random_objects_17.json",
                 // "data/cycled_objects_8.json",
                 // "data/double_cycled_12.json",
+                "data/real_robot_experiment.json",
                 "--method",
                 "ours"
                 // "baseline"
@@ -77,6 +78,24 @@
             "type": "debugpy",
             "request": "launch",
             "program": "dual_arms_test.py",
+            "console": "integratedTerminal",
+            "args": [
+            ]
+        },
+        {
+            "name": "real_robot_experiment.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "real_robot_experiment.py",
+            "console": "integratedTerminal",
+            "args": [
+            ]
+        },
+        {
+            "name": "load_plan_execute.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "load_plan_execute.py",
             "console": "integratedTerminal",
             "args": [
             ]

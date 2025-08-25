@@ -1387,3 +1387,7 @@ if __name__ == '__main__':
     print("task.chains: ", task.dependency_graph.get_chains())
     print("task.independent_sets: ", task.dependency_graph.get_independent_sets())
 
+    action1 = GripperAction.CLOSE
+    action2 = GripperAction.OPEN
+    print("action1: ", str(action1).split('.')[-1])
+    print("action2: ", str(action2))

@@ -1431,7 +1431,7 @@ class DualArmEnv:
             
             cmd_plan = self.get_plan_single(result)
             self.visualize_plan(cmd_plan)
-            cmd = self.move_z(0.3, 900, angle)
+            cmd, _ = self.move_z(0.3, 900, angle)
             self.visualize_plan(cmd)
 
         for angle in angles:
@@ -1712,8 +1712,7 @@ if __name__ == '__main__':
 
     dual_arm = DualArmEnv(task,
                           False,
-                          batch_size = 3,
-                          constrain_grasp_approach=False,
+                          batch_size = 3
                           )
     dual_arm.reset()
     if test_grasp_angles:

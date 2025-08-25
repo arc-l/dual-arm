@@ -1,5 +1,4 @@
 from helper import save_plan, load_plan 
-import helper
 
 from dual_arms import DualArmEnv
 from baseline_dual_arm import Baseline
