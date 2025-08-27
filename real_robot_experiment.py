@@ -71,7 +71,7 @@ if __name__ == "__main__":
     arm2 = UR_Robotiq_2f_85_Controller(robot_ip="172.17.139.103", init_gripper=True, dt=0.02)
     real_dual_arm = DualArm(arm1, arm2)
     real_dual_arm.go_home()
-    get_arrangement()
+    # get_arrangement()
     task = Task.read_from_json("data/real_robot_experiment.json")
     dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, num_buffers=20, pure_curobo=False)
     plan = dual_arm_env.plan()
