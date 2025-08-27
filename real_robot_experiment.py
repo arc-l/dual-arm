@@ -15,11 +15,14 @@ def update_cube_poses_real2sim(camera:Camera):
     perception = Perception(camera=camera)
     perception.stream()
     poses = perception.update_cube_poses(visualize=True)
+    print("poses=")
+    print(poses)
     # for the poses, add 0.55 at y axis, then rotate 90 degrees around the z axis
     for key, pose in poses.items():
         pose[1] += 0.55  # Add 0.55 to the y axis
         rotation_matrix = R.from_euler('z', 90, degrees=True).as_matrix()
         rotated_pose = rotation_matrix @ pose
+        rotated_pose[2] = 0.038/2
         poses[key] = rotated_pose
     return poses
 
@@ -38,7 +41,9 @@ def plan_process(plan):
             arm1_positions = positions[:, :6]
             arm2_positions = positions[:, 6:]
             arm1_positions[:, 0] += np.pi/2  # Add pi/2 to the base joint
+            arm1_positions[:, -1] -= np.pi/2
             arm2_positions[:, 0] += np.pi/2  # Add pi/2 to the base joint
+            arm2_positions[:, -1] -= np.pi/2
             new_plan.append([arm1_positions, arm2_positions])
     return new_plan
 
@@ -62,13 +67,14 @@ def get_arrangement():
         json.dump(data, f, indent=4)
 
 if __name__ == "__main__":
+    arm1 = UR_Robotiq_2f_85_Controller(robot_ip="172.17.139.100", init_gripper=True, dt=0.02)
+    arm2 = UR_Robotiq_2f_85_Controller(robot_ip="172.17.139.103", init_gripper=True, dt=0.02)
+    real_dual_arm = DualArm(arm1, arm2)
+    real_dual_arm.go_home()
     get_arrangement()
     task = Task.read_from_json("data/real_robot_experiment.json")
     dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, num_buffers=20, pure_curobo=False)
     plan = dual_arm_env.plan()
     save_plan(plan, "real_robot_experiment.json", "ours")
     plan = plan_process(plan)
-    arm1 = UR_Robotiq_2f_85_Controller(robot_ip="172.17.139.100", init_gripper=True, dt=0.02)
-    arm2 = UR_Robotiq_2f_85_Controller(robot_ip="172.17.139.103", init_gripper=True, dt=0.02)
-    real_dual_arm = DualArm(arm1, arm2)
-    real_dual_arm.execute(plan)
+    real_dual_arm.execute(plan, interpolation_num=5)

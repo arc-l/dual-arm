@@ -22,4 +22,4 @@ if __name__ == "__main__":
     arm1 = UR_Robotiq_2f_85_Controller(robot_ip="172.17.139.100", init_gripper=True, dt=0.02)
     arm2 = UR_Robotiq_2f_85_Controller(robot_ip="172.17.139.103", init_gripper=True, dt=0.02)
     real_dual_arm = DualArm(arm1, arm2)
-    real_dual_arm.execute(plan)
+    real_dual_arm.execute(plan, interpolation_num=5)
