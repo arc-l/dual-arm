@@ -728,7 +728,7 @@ class DualArmEnv:
         return task_execution_result
 
     def motion_plan(self, task_plan: TaskPlan):
-        needs_naive_plan = True
+        needs_naive_plan = False
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
         else:
@@ -751,6 +751,10 @@ class DualArmEnv:
             if not result.success:
                 print("Failed to go to start position, using naive waypoints")
                 needs_naive_plan = True if not self.pure_curobo else False 
+                state = self.single_motion_gen.kinematics.get_state(self.get_current_arm_js().position)
+                spheres = state.link_spheres_tensor.unsqueeze(1)
+                d_world = self.robot_world.get_collision_distance(spheres)
+                print(f"d_world={d_world}")
                 self.check_object_collision_enabled()
                 if self.pure_curobo:
                     return None 
@@ -765,6 +769,8 @@ class DualArmEnv:
         if needs_naive_plan:
             valid = self.naive_motion_plan(task_plan)
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
+            d_world, d_self = self.robot_world.get_world_self_collision_distance_from_joints(self.get_current_arm_js().position)
+            print(f"d_world={d_world}, d_self={d_self}")
             if result.success:
                 cmd_plan = self.get_plan_single(result)
                 cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
@@ -1035,10 +1041,10 @@ class DualArmEnv:
             #TODO: Do I need to be concerned that the attaching and detaching happens after the gripper control in self.motion_plan()?
             if task_plan.arm1_gripper_action == GripperAction.CLOSE:
                 if task_plan.arm1_assigned_object != -1:
-                    print(f"Attaching object {task_plan.arm1_assigned_object} to {self.arm1}")
-                    self.attach_obj(cu_js=self.get_current_arm_js(), cube_name=self.objects_curobo[task_plan.arm1_assigned_object].name, arm_name=self.arm1)
-                    # print(f"Attaching object {task_plan.arm1_assigned_object} to attached_object")
-                    # self.attach_obj(cu_js=self.get_current_arm_js(), cube_name=self.objects_curobo[task_plan.arm1_assigned_object].name, arm_name="attached_object")
+                    # print(f"Attaching object {task_plan.arm1_assigned_object} to {self.arm1}")
+                    # self.attach_obj(cu_js=self.get_current_arm_js(), cube_name=self.objects_curobo[task_plan.arm1_assigned_object].name, arm_name=self.arm1)
+                    print(f"Attaching object {task_plan.arm1_assigned_object} to attached_object")
+                    self.attach_obj(cu_js=self.get_current_arm_js(), cube_name=self.objects_curobo[task_plan.arm1_assigned_object].name, arm_name="attached_object", ee_name=self.arm1)
                     idx_to_sync.remove(task_plan.arm1_assigned_object)
                 # else:
                 #     object_ids = list(range(self.task.num_objects))
@@ -1051,21 +1057,21 @@ class DualArmEnv:
                 #     idx_to_sync.remove(id_to_attach)
                     
             if task_plan.arm2_gripper_action == GripperAction.CLOSE:
-                print(f"Attaching object {task_plan.arm2_assigned_object} to {self.arm2}")
-                self.attach_obj(cu_js=self.get_current_arm_js(), cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name=self.arm2)
-                # print(f"Attaching object {task_plan.arm2_assigned_object} to attached_object_1")
-                # self.attach_obj(cu_js=self.get_current_arm_js(), cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name="attached_object_1")
+                # print(f"Attaching object {task_plan.arm2_assigned_object} to {self.arm2}")
+                # self.attach_obj(cu_js=self.get_current_arm_js(), cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name=self.arm2)
+                print(f"Attaching object {task_plan.arm2_assigned_object} to attached_object_1")
+                self.attach_obj(cu_js=self.get_current_arm_js(), cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name="attached_object_1", ee_name=self.arm2)
                 idx_to_sync.remove(task_plan.arm2_assigned_object)
             if task_plan.arm1_gripper_action == GripperAction.OPEN and task_plan.arm1_assigned_object != -1:
-                print(f"Detaching object {task_plan.arm1_assigned_object} from {self.arm1}")
-                self.detach_obj(cube_name=self.objects_curobo[task_plan.arm1_assigned_object].name, arm_name=self.arm1)
-                # print(f"Detaching object {task_plan.arm1_assigned_object} from attached_object")
-                # self.detach_obj(cube_name=self.objects_curobo[task_plan.arm1_assigned_object].name, arm_name="attached_object")
+                # print(f"Detaching object {task_plan.arm1_assigned_object} from {self.arm1}")
+                # self.detach_obj(cube_name=self.objects_curobo[task_plan.arm1_assigned_object].name, arm_name=self.arm1)
+                print(f"Detaching object {task_plan.arm1_assigned_object} from attached_object")
+                self.detach_obj(cube_name=self.objects_curobo[task_plan.arm1_assigned_object].name, arm_name="attached_object")
             if task_plan.arm2_gripper_action == GripperAction.OPEN:
-                print(f"Detaching object {task_plan.arm2_assigned_object} from {self.arm2}")
-                self.detach_obj(cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name=self.arm2)
-                # print(f"Detaching object {task_plan.arm2_assigned_object} from attached_object_1")
-                # self.detach_obj(cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name="attached_object_1")
+                # print(f"Detaching object {task_plan.arm2_assigned_object} from {self.arm2}")
+                # self.detach_obj(cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name=self.arm2)
+                print(f"Detaching object {task_plan.arm2_assigned_object} from attached_object_1")
+                self.detach_obj(cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name="attached_object_1")
 
             if sync_after_open:
                 # self.sync_isaacsim_curobo(idx_to_sync=idx_to_sync)
@@ -1151,7 +1157,8 @@ class DualArmEnv:
             name = obj.name
             env_idx = 0
             obs_idx = self.single_motion_gen.world_coll_checker.get_obb_idx(name, env_idx)
-            # print(f"{name} single_motion_gen collision enabled = ", self.single_motion_gen.world_coll_checker._cube_tensor_list[2][env_idx, obs_idx].cpu().numpy(), end=' ') 
+            print(f"{name} single_motion_gen collision enabled = ", self.single_motion_gen.world_coll_checker._cube_tensor_list[2][env_idx, obs_idx].cpu().numpy(), end=' ') 
+        print()
         print()
 
     def get_current_js(self):
@@ -1448,7 +1455,8 @@ class DualArmEnv:
         self,
         cu_js: JointState,
         cube_name: str,
-        arm_name: str
+        arm_name: str,
+        ee_name: str
     ) -> None:
         self.single_motion_gen.attach_objects_to_robot(
             cu_js,
@@ -1459,7 +1467,8 @@ class DualArmEnv:
             voxelize_method="subdivide",
             surface_sphere_radius=0.0005,
             # world_objects_pose_offset=Pose.from_list([0, 0, 0.01, 1, 0, 0, 0], self.tensor_args),
-            link_name=arm_name
+            link_name=arm_name,
+            ee_name=ee_name
         )
         self.single_motion_gen.world_coll_checker.enable_obstacle(enable=False, name=cube_name)
 
