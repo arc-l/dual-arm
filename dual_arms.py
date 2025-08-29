@@ -728,7 +728,7 @@ class DualArmEnv:
         return task_execution_result
 
     def motion_plan(self, task_plan: TaskPlan, pre_grasp:bool=True):
-        needs_naive_plan = False
+        needs_naive_plan = True
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
         else:
@@ -1768,7 +1768,7 @@ class DualArmEnv:
 
     def add_plan_to_record(self, cmd_plan:JointState|List):
         if isinstance(cmd_plan, list):
-            self.recorded_plan.append(cmd_plan)
+                self.recorded_plan.append(cmd_plan)
         else:
             assert cmd_plan.joint_names is not None
             self.recorded_plan.append(cmd_plan)
