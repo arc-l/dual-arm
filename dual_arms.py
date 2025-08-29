@@ -727,7 +727,7 @@ class DualArmEnv:
         task_execution_result.buffer = task_plan.buffer
         return task_execution_result
 
-    def motion_plan(self, task_plan: TaskPlan):
+    def motion_plan(self, task_plan: TaskPlan, pre_grasp:bool=True):
         needs_naive_plan = False
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
@@ -739,8 +739,9 @@ class DualArmEnv:
             goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ).copy() if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object ).copy()
         
         # safety pre_grasp
-        goal_arm1[2] += self.pre_grasp_height
-        goal_arm2[2] += self.pre_grasp_height
+        if pre_grasp:
+            goal_arm1[2] += self.pre_grasp_height
+            goal_arm2[2] += self.pre_grasp_height
         print(f"default ee pos1={self.default_ee_pos[self.arm1]}, goal_arm1={goal_arm1}")
         print(f"default ee pos2={self.default_ee_pos[self.arm2]}, goal_arm2={goal_arm2}")
 
@@ -1010,6 +1011,17 @@ class DualArmEnv:
             task_plan = self.task.plan()
         return self.filter_task_plans(task_plan)
 
+    def go_home(self):
+        task_plan = TaskPlan()
+        task_plan.arm1_angle=900
+        task_plan.arm2_angle=900
+        task_plan.arm1_assigned_object = -1
+        task_plan.arm2_assigned_object = -1
+        task_plan.arm1_to_start = False
+        task_plan.arm2_to_start = False
+        task_execution_result = self.motion_plan(task_plan, pre_grasp=False)
+        return task_plan
+
     def plan(self):
         self.reset()
         while not self.task.finished():
@@ -1079,6 +1091,7 @@ class DualArmEnv:
 
             self.check_object_collision_enabled()
             self.task.update(task_execution_result)
+        self.go_home()
         plan = self.sanity_check()
         return plan
 
