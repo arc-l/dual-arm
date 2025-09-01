@@ -13,7 +13,8 @@ class Perception:
             self.camera = Camera(calibrated=True, on_hand=False)
         else:
             self.camera = camera
-        self.aruco_dict_objs = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
+        # self.aruco_dict_objs = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
+        self.aruco_dict_objs = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_1000)
         self.aruco_detector_objs = cv2.aruco.ArucoDetector(self.aruco_dict_objs)
         self.use_letters = use_letters
 

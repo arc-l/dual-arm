@@ -1020,7 +1020,7 @@ class DualArmEnv:
         task_plan.arm1_to_start = False
         task_plan.arm2_to_start = False
         task_execution_result = self.motion_plan(task_plan, pre_grasp=False)
-        return task_plan
+        return task_execution_result
 
     def plan(self):
         self.reset()

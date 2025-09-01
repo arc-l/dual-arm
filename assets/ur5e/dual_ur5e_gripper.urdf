@@ -66,14 +66,13 @@
 
   <link name="base_link_1"/>
  
-
-
-    <!-- joints: main serial chain -->
+      <!-- joints: main serial chain -->
   <joint name="base_fixture_j_base_link" type="fixed">
     <parent link="base_fixture_link"/>
     <child link="base_link"/>
     <!-- <origin rpy=" 0 0 0" xyz="-0.05 0.0 0.0"/> -->
-    <origin rpy=" 0 0 0" xyz="-0.55 -0.018056 0.0"/>
+    <!-- <origin rpy=" 0 0 0" xyz="-0.55 -0.018056 0.0"/> -->
+    <origin rpy=" 0 0 0" xyz="-0.55 0 0.0"/>
   </joint>
 
 
@@ -82,11 +81,10 @@
     <parent link="base_fixture_link"/>
     <child link="base_link_1"/>
     <!-- <origin rpy=" 0 0 0" xyz="1.05 0.015 0.0"/> -->
-    <origin rpy=" 0 0 0" xyz="0.5476302 0.0 0.0"/>
+    <origin rpy=" 0 0 0" xyz="0.5449 0.0 0.0"/>
   </joint>
 
 
-  
   <link name="base_link_inertia">
     <visual>
       <origin rpy="0 0 3.141592653589793" xyz="0 0 0"/>
