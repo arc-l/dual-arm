@@ -79,6 +79,26 @@ class Baseline(DualArmEnv):
         return action_list
 
 
+    def baseline_task_plan(self):
+        start_arr, goal_arr = self.prepare_input()
+        Height = 1000
+        Width = 1000
+        size = 41.7 * np.sqrt(2) # 0.025 / 0.6 * 1000 * np.sqrt(2)
+        size = self.task.object_size/2 / self.task.map_length * 1000 # 0.025 / 0.6 * 1000 * np.sqrt(2)
+        planner = Bi_Directional_Search_Tree_Planner(
+            start_arr, 
+            goal_arr, 
+            Height, 
+            Width, 
+            size, 
+            sampling=True, 
+            overlap_rate=1.0, 
+            num_arms=2,
+            makespan='MC'
+        )
+        action_list = planner.action_list
+        return action_list
+
 
     @timeout_decorator.timeout(1000)
     def plan(self, use_our_tp=False, use_our_mp=False):
@@ -117,7 +137,7 @@ class Baseline(DualArmEnv):
                 Width, Height,start_arr, goal_arr, size, action_list, 
                 overlap_rate = 1.0, speed=speed, 
                 time_step_size=time_step_size, control_mode=control_mode, 
-                gui=not self.headless_baseline, method=method, debug = False)
+                gui=not self.headless_baseline, method=method, debug = True)
             recorded_plan = result_dict['recorded_plan']
             recorded_plan = self.post_process(recorded_plan)
             return recorded_plan
@@ -247,15 +267,16 @@ if __name__ == '__main__':
     map_length:float = 0.6 
     object_size:float = 0.045 
     task = Task(num_objects, map_width, map_length, object_size)
+    task = Task.read_from_json('data/cycled_objects_4.json')
     # task.generate(cycled=True)
     # task.generate_fixed_two_objects(offset=0.)
     # task.generate_chained_two_objects()
-    task.generate_fixed_cycled_objects(radius=0.2)
+    # task.generate_fixed_cycled_objects(radius=0.2)
     # task.generate_fixed_two_objects_to_test_grasp_orientation()
     # task.generate_fixed_two_to_test_batch_planner()
     # task.generate_fixed_four_objects()
     # task.generate_chained_four_objects()
     # task.generate_fixed_six_objects()
-    dual_arm = Baseline(task)
+    dual_arm = Baseline(task, display=False, headless=False)
     recorded_plan = dual_arm.plan()
     dual_arm.play(recorded_plan=recorded_plan)

@@ -80,6 +80,28 @@
             "console": "integratedTerminal",
             "args": [
             ]
+        },
+        {
+            "name": "evaluate_task_planner.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "evaluate_task_planner.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--input",
+                // "data/task_2_cycle.json",
+                // "data/random_objects_4.json",
+                // "data/mixed_5.json",
+                // "data/random_objects_17.json",
+                "data/cycled_objects_4.json",
+                // "data/double_cycled_12.json",
+                "--method",
+                "ours"
+                // "baseline"
+                // "baseline_with_our_tp"
+                // "ours_with_baseline_tp"
+                // "our_tp_with_curobo"
+            ]
         }
     ]
 }
