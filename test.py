@@ -22,7 +22,7 @@ def generate_mixed(i):
                 print("clearance 0.05 failed, trying clearance 0.0")
                 task.generate(gen_type="mixed", clearance=0.0)
     task.write_to_json(f"data/mixed_{i}.json")
-    task.draw_four_panel(f"data_vis/mixed_{i}.png")
+    task.draw_all(f"data_vis/mixed_{i}.png")
 
 if __name__ == "__main__":
     generate_mixed(1)

@@ -1246,11 +1246,13 @@ class Task:
         else:
             plt.show()
     
-    def draw_four_panel(self, save_path=None):
-        fig, axes = plt.subplots(1, 4, figsize=(24, 6))
-        titles = ['Start Positions', 'Goal Positions', 'Start & Goal Overlay', 'Dependency Graph']
+    def draw_all(self, save_path=None, overlay=False):
+        fig_num = 4 if overlay else 3
+        fig, axes = plt.subplots(1, fig_num, figsize=(6 * fig_num, 6))
+        titles = ['Start Positions', 'Goal Positions', 'Start & Goal Overlay', 'Dependency Graph'] if overlay else ['Start Positions', 'Goal Positions', 'Dependency Graph']
         goal_scale = 1.2
         scaled_size = self.object_size * goal_scale
+        fig_cnt = 0
 
         def draw_table(ax, title):
             table_rect = patches.FancyBboxPatch(
@@ -1266,7 +1268,7 @@ class Task:
             ax.set_xlim([-self.map_width / 2, self.map_width / 2])
             ax.set_ylim([-self.map_length / 2, self.map_length / 2])
             ax.set_aspect('equal')
-            ax.set_title(title)
+            ax.set_title(title, fontsize=20)
             ax.set_xticks([])
             ax.set_yticks([])
 
@@ -1281,24 +1283,28 @@ class Task:
                     hatch=hatch,
                     alpha=1.0
                 ))
-                ax.text(pos[0], pos[1], f"{label_prefix}{i}", color='black', fontsize=10,
+                ax.text(pos[0], pos[1], f"{label_prefix}{i}", color='black', fontsize=20,
                         ha='center', va='center')
 
         for i, ax in enumerate(axes):
             draw_table(ax, titles[i])
 
         # Start
-        draw_objects(axes[0], self.start_dict, self.colors, self.object_size)
+        draw_objects(axes[fig_cnt], self.start_dict, self.colors, self.object_size)
+        fig_cnt += 1
 
         # Goal
-        draw_objects(axes[1], self.goal_dict, self.colors, scaled_size, hatch='/')
+        draw_objects(axes[fig_cnt], self.goal_dict, self.colors, scaled_size, hatch='/')
+        fig_cnt += 1
 
         # Overlay
-        draw_objects(axes[2], self.goal_dict, self.colors, scaled_size, hatch='/', label_prefix='G')
-        draw_objects(axes[2], self.start_dict, self.colors, self.object_size, label_prefix='S')
+        if overlay:
+            draw_objects(axes[fig_cnt], self.goal_dict, self.colors, scaled_size, hatch='/', label_prefix='G')
+            draw_objects(axes[fig_cnt], self.start_dict, self.colors, self.object_size, label_prefix='S')
+            fig_cnt += 1
 
         # Dependency Graph
-        draw_objects(axes[3], self.start_dict, self.colors, self.object_size)
+        draw_objects(axes[fig_cnt], self.start_dict, self.colors, self.object_size)
 
         # Build a mapping from edge to color based on cycles
         edge_color_map = {}
@@ -1335,7 +1341,7 @@ class Task:
                 # Color based on cycles
                 colors = edge_color_map.get((interfering, dependent), ['black'])
                 for color in colors:
-                    axes[3].annotate("",
+                    axes[fig_cnt].annotate("",
                         xy=dst_edge, xycoords='data',
                         xytext=src_edge, textcoords='data',
                         arrowprops=dict(
@@ -1382,7 +1388,7 @@ if __name__ == '__main__':
     # task.draw_triptych_to_ppt("results/test.pptx", slide_title="Running Example")
 
     task = Task.read_from_json("data/random_objects_18.json")
-    task.draw_four_panel("results/four_panel.png")
+    task.draw_all("results/four_panel.png")
     print("task.cycles: ", task.dependency_graph.get_cycles())
     print("task.chains: ", task.dependency_graph.get_chains())
     print("task.independent_sets: ", task.dependency_graph.get_independent_sets())
