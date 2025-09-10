@@ -11,13 +11,14 @@ ignore_baseline_for_double_cycled = True
 
 # Define fixed order of testcase types
 testcase_types_order = ["mixed", "cycled", "double_cycled", "random"]
-methods = ["ours", "baseline", "baseline_with_our_tp", "ours_with_baseline_tp", "our_tp_with_curobo"]
+methods = ["ours", "baseline", "baseline_with_our_tp", "ours_with_baseline_tp", "our_tp_with_curobo", "baseline_tp_with_curobo"]
 method_display_names = {
     "ours": "Ours",
     "baseline": "Baseline",
     "baseline_with_our_tp": "Baseline+Our TP",
     "ours_with_baseline_tp": "Ours+Baseline TP",
-    "our_tp_with_curobo": "Our TP+Curobo"
+    "our_tp_with_curobo": "Our TP+Curobo",
+    "baseline_tp_with_curobo": "Baseline TP+Curobo"
 }
 
 colors = {
@@ -26,6 +27,7 @@ colors = {
     "baseline_with_our_tp": "green",
     "ours_with_baseline_tp": "orange",
     "our_tp_with_curobo": "purple",
+    "baseline_tp_with_curobo": "brown"
 }
 
 # Helper to extract number of objects from testcase name

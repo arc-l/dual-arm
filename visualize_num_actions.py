@@ -134,10 +134,21 @@ def plot_boxplot(ratios_by_type):
 		return
 
 	plt.figure(figsize=(10, 5))
+	main_colors = {
+		'mixed': 'red',
+		'cycled': 'green',
+		'double_cycled': 'blue',
+		'random': 'orange',
+		'other': 'gray'
+	}
+	import matplotlib.colors as mcolors
+	def lighten(color, amount=0.5):
+		c = mcolors.to_rgb(color)
+		return mcolors.to_hex([1 - (1 - v) * amount for v in c])
 	box = plt.boxplot(data, patch_artist=True, labels=labels, medianprops=dict(color='black', linewidth=2))
-	colors = ["lightblue", "lightgreen", "violet", "wheat", "lightgray"]
-	for patch, c in zip(box['boxes'], colors):
-		patch.set_facecolor(c)
+	for patch, label in zip(box['boxes'], labels):
+		base_color = main_colors.get(label, 'gray')
+		patch.set_facecolor(lighten(base_color, 0.5))
 	plt.axhline(1.0, color='red', linestyle='--', linewidth=1)
 	plt.ylabel("Num Actions Ratio (baseline / ours)", fontname='Times New Roman', fontsize=20)
 	plt.title("Baseline vs Ours: Num Actions Ratio by Map Type", fontname='Times New Roman', fontsize=20)
@@ -190,53 +201,89 @@ def extract_num_objects(testcase_name: str) -> int:
 
 
 def plot_absolute_actions(action_counts):
+	type_display = {
+		'mixed': 'mixed',
+		'cycled': 'single cycle',
+		'double_cycled': 'double cycle',
+		'random': 'random',
+		'other': 'other'
+	}
 	"""Grouped bar plot of absolute action counts per testcase (baseline vs ours)."""
 	entries = []  # list of (map_type, num_objects, testcase, baseline_cnt, ours_cnt)
 	for testcase, methods_dict in action_counts.items():
 		if all(m in methods_dict for m in METHODS):
 			map_type = infer_map_type(testcase)
 			n_objs = extract_num_objects(testcase)
-			entries.append((map_type, n_objs, testcase, methods_dict['baseline'], methods_dict['ours']))
+			baseline_cnt = methods_dict['baseline']
+			ours_cnt = methods_dict['ours']
+			if baseline_cnt != ours_cnt:
+				entries.append((map_type, n_objs, testcase, baseline_cnt, ours_cnt))
 
 	if not entries:
 		print("No complete testcase pairs for absolute actions plot.")
 		return
 
-	# Sort by map type defined order then num objects then name
-	order_index = {mt: i for i, mt in enumerate(MAP_TYPE_PREFIXES + ["other"])}
-	entries.sort(key=lambda x: (order_index.get(x[0], 999), x[1], x[2]))
+	# Sort by increasing baseline actions
+	entries.sort(key=lambda x: x[3])
 
-	testcase_names = []
-	for i in range(len(entries)):
-		e = entries[i]
-		if e[0] == 'mixed':
-			name = f"mixed_12objects"
-		elif e[0] == 'cycled':
-			name = f"single_cycle_{e[1]}objects"
-		elif e[0] == 'double_cycled':
-			name = f"double_cycle_{e[1]}objects"
-		elif e[0] == 'random':
-			name = f"random_{e[1]}objects"
-		testcase_names.append(name)
+	# Color mapping by map type
+	main_colors = {
+		'mixed': 'red',
+		'cycled': 'green',
+		'double_cycled': 'blue',
+		'random': 'orange',
+		'other': 'gray'
+	}
+	import matplotlib.colors as mcolors
+	def lighten(color, amount=0.5):
+		c = mcolors.to_rgb(color)
+		return mcolors.to_hex([1 - (1 - v) * amount for v in c])
+	def darken(color, amount=0.7):
+		c = mcolors.to_rgb(color)
+		return mcolors.to_hex([v * amount for v in c])
+
+	testcase_names = [f"{type_display.get(e[0], e[0])}_{e[1]}_objects" for e in entries]
 	baseline_vals = [e[3] for e in entries]
 	ours_vals = [e[4] for e in entries]
+	map_types = [e[0] for e in entries]
 
 	import numpy as np
 	x = np.arange(len(testcase_names))
-	width = 0.4
+	width = 0.6
 
-	plt.figure(figsize=(18, 6))
-	plt.bar(x - width/2, baseline_vals, width, label='Baseline', color='gray')
-	plt.bar(x + width/2, ours_vals, width, label='Ours', color='blue')
+	plt.figure(figsize=(max(10, len(testcase_names)*0.5), 6))
+	for idx in range(len(x)):
+		color = main_colors.get(map_types[idx], 'gray')
+		base_col = darken(color, 0.7)
+		ours_col = lighten(color, 0.5)
+		# Plot smaller bar in front
+		if baseline_vals[idx] < ours_vals[idx]:
+			plt.bar(x[idx], ours_vals[idx], width=width, color=ours_col, label=None, zorder=1)
+			plt.bar(x[idx], baseline_vals[idx], width=width*0.6, color=base_col, label=None, zorder=2)
+		else:
+			plt.bar(x[idx], baseline_vals[idx], width=width, color=base_col, label=None, zorder=1)
+			plt.bar(x[idx], ours_vals[idx], width=width*0.6, color=ours_col, label=None, zorder=2)
+
+	# Simplified legend: just show the four types, lighter is Ours, darker is Baseline
+	from matplotlib.patches import Patch
+	legend_elems = [
+		Patch(facecolor='red', label='mixed'),
+		Patch(facecolor='green', label='single cycle'),
+		Patch(facecolor='blue', label='double cycle'),
+		Patch(facecolor='orange', label='random'),
+	]
+	leg = plt.legend(handles=legend_elems, fontsize=10, loc='upper left', ncol=2, title='Type (lighter: Ours, darker: Baseline)', title_fontsize=10)
+	leg.get_title().set_fontname('Times New Roman')
+	leg.get_title().set_fontsize(16)
+	for text in leg.get_texts():
+		text.set_fontname('Times New Roman')
+		text.set_fontsize(16)
+
 	plt.ylabel('Number of Actions', fontname='Times New Roman', fontsize=20)
 	# plt.xlabel('Test Cases', fontname='Times New Roman', fontsize=20)
 	plt.title('Absolute Number of Actions per Test Case', fontname='Times New Roman', fontsize=20)
-	plt.xticks(x, testcase_names, rotation=45, ha='right', fontsize=15)
+	plt.xticks(x, testcase_names, rotation=45, ha='right', fontsize=10)
 	plt.yticks(fontsize=20)
-	leg = plt.legend(fontsize=15, loc='upper left')
-	for text in leg.get_texts():
-		text.set_fontname('Times New Roman')
-		text.set_fontsize(15)
 	plt.tight_layout()
 	out_path = os.path.join(RESULTS_DIR, 'num_actions_absolute_barplot.png')
 	plt.savefig(out_path, dpi=100)

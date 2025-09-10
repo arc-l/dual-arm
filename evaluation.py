@@ -12,7 +12,7 @@ def parse_arguments():
     
     parser.add_argument(
         "--method",
-        choices=["baseline", "ours", "baseline_with_our_tp", "ours_with_baseline_tp",  "our_tp_with_curobo"],
+        choices=["baseline", "ours", "baseline_with_our_tp", "ours_with_baseline_tp",  "our_tp_with_curobo", "baseline_tp_with_curobo"],
         required=True,
         help="Specify the method to use: 'baseline' or 'ours'."
     )
@@ -57,6 +57,11 @@ if __name__ == "__main__":
     elif args.method == "ours_with_baseline_tp":
         print("Using baseline tp + our mp")
         baseline = Baseline(task, headless=True, display=True)
+        plan = baseline.plan(use_our_tp=False, use_our_mp=True)
+    elif args.method == "baseline_tp_with_curobo":
+        print("Using baseline tp + our mp")
+        baseline = Baseline(task, headless=True, display=True)
+        baseline.pure_curobo = True
         plan = baseline.plan(use_our_tp=False, use_our_mp=True)
     elif args.method == "our_tp_with_curobo":
         dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, num_buffers=20, pure_curobo=True)

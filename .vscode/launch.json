@@ -32,15 +32,16 @@
                 // "data/task_2_cycle.json",
                 // "data/random_objects_4.json",
                 // "data/mixed_5.json",
-                "data/random_objects_17.json",
+                // "data/random_objects_17.json",
                 // "data/cycled_objects_8.json",
-                // "data/double_cycled_12.json",
+                "data/double_cycled_7.json",
                 "--method",
-                "ours"
+                // "ours"
                 // "baseline"
                 // "baseline_with_our_tp"
                 // "ours_with_baseline_tp"
                 // "our_tp_with_curobo"
+                "baseline_tp_with_curobo"
             ]
         },
         {

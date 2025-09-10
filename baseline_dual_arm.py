@@ -227,6 +227,9 @@ class Baseline(DualArmEnv):
             # place the object in the goal
             task_execution_result = super().motion_plan(task_plan_to_start)
             self.old_task_plan = task_plan_to_start
+            if task_execution_result is None:
+                print("No plan found.")
+                exit(1)
             self.task.update(task_execution_result)
         
             if arm1_object is not None:
