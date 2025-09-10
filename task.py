@@ -563,7 +563,7 @@ class Task:
         axes[2].legend(handles=legend_elements, loc='lower right')
 
         plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.savefig(save_path, dpi=100, bbox_inches='tight')
         print(f"Saved visualization to: {save_path}")
         plt.close(fig)
     
@@ -1167,21 +1167,23 @@ class Task:
                 src_edge = get_edge_center(source, dest)
                 dst_edge = get_edge_center(dest, source)
 
-                ax.annotate("",
-                            xy=dst_edge, xycoords='data',
-                            xytext=src_edge, textcoords='data',
-                            arrowprops=dict(
-                                arrowstyle="->",
-                                color='black',
-                                lw=1.5,
-                                mutation_scale=40,
-                                connectionstyle="arc3,rad=0.3"  # Your curve
-                            ))
-                ax.set_xticks([])
-                ax.set_yticks([])
+                ax.annotate(
+                    "",
+                    xy=dst_edge, xycoords='data',
+                    xytext=src_edge, textcoords='data',
+                    arrowprops=dict(
+                        arrowstyle="->",
+                        color='black',
+                        lw=1.5,
+                        mutation_scale=40,
+                        connectionstyle="arc3,rad=0.3"
+                    )
+                )
 
+        ax.set_xticks([])
+        ax.set_yticks([])
         plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.savefig(save_path, dpi=100, bbox_inches='tight')
         print(f"Saved edge-to-edge dependency graph to: {save_path}")
         plt.close(fig)
 
@@ -1240,7 +1242,7 @@ class Task:
 
         plt.tight_layout()
         if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.savefig(save_path, dpi=100, bbox_inches='tight')
             print(f"Saved to {save_path}")
             plt.close(fig)
         else:
@@ -1268,7 +1270,7 @@ class Task:
             ax.set_xlim([-self.map_width / 2, self.map_width / 2])
             ax.set_ylim([-self.map_length / 2, self.map_length / 2])
             ax.set_aspect('equal')
-            ax.set_title(title, fontsize=20)
+            ax.set_title(title, fontsize=30, fontname='Times New Roman')
             ax.set_xticks([])
             ax.set_yticks([])
 
@@ -1283,8 +1285,11 @@ class Task:
                     hatch=hatch,
                     alpha=1.0
                 ))
-                ax.text(pos[0], pos[1], f"{label_prefix}{i}", color='black', fontsize=20,
-                        ha='center', va='center')
+                ax.text(
+                    pos[0], pos[1], f"{label_prefix}{i}",
+                    color='black', fontsize=30,
+                    ha='center', va='center', fontname='Times New Roman'
+                )
 
         for i, ax in enumerate(axes):
             draw_table(ax, titles[i])
@@ -1355,7 +1360,7 @@ class Task:
     
         plt.tight_layout()
         if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.savefig(save_path, dpi=100, bbox_inches='tight')
             print(f"Saved 4-panel view to: {save_path}")
             plt.close(fig)
         else:

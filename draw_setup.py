@@ -1,4 +1,5 @@
 from task import Task
+import os
 
 
 if __name__ == "__main__":
@@ -11,4 +12,4 @@ if __name__ == "__main__":
     ]
     for task_file in task_files:
         task = Task.read_from_json(f"{data_dir}/{task_file}")
-        task.draw_all(task_file.replace('.json', '.png'))
+        task.draw_all(os.path.join("results", task_file.replace('.json', '.png')))

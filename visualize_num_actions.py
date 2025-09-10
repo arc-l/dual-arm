@@ -3,6 +3,10 @@ import json
 from collections import defaultdict
 import matplotlib.pyplot as plt
 
+# Enforce Times New Roman font for all plots in this script
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.size'] = 20
+
 """visualize_num_actions.py
 
 Reads all files ending with `_actions.json` inside the `results` folder.
@@ -130,16 +134,18 @@ def plot_boxplot(ratios_by_type):
 		return
 
 	plt.figure(figsize=(10, 5))
-	box = plt.boxplot(data, patch_artist=True, labels=labels)
+	box = plt.boxplot(data, patch_artist=True, labels=labels, medianprops=dict(color='black', linewidth=2))
 	colors = ["lightblue", "lightgreen", "violet", "wheat", "lightgray"]
 	for patch, c in zip(box['boxes'], colors):
 		patch.set_facecolor(c)
 	plt.axhline(1.0, color='red', linestyle='--', linewidth=1)
-	plt.ylabel("Num Actions Ratio (baseline / ours)")
-	plt.title("Baseline vs Ours: Num Actions Ratio by Map Type")
+	plt.ylabel("Num Actions Ratio (baseline / ours)", fontname='Times New Roman', fontsize=20)
+	plt.title("Baseline vs Ours: Num Actions Ratio by Map Type", fontname='Times New Roman', fontsize=20)
+	plt.xticks(fontsize=20)
+	plt.yticks(fontsize=20)
 	plt.tight_layout()
 	out_path = os.path.join(RESULTS_DIR, "num_actions_ratio_boxplot.png")
-	plt.savefig(out_path, dpi=400)
+	plt.savefig(out_path, dpi=100)
 	print(f"Saved boxplot to {out_path}")
 
 
@@ -162,14 +168,15 @@ def plot_mean_bars(ratios_by_type):
 	x = range(len(labels))
 	plt.bar(x, means, color="steelblue")
 	plt.axhline(1.0, color='red', linestyle='--', linewidth=1)
-	plt.xticks(x, labels)
-	plt.ylabel("Mean Ratio (baseline / ours)")
-	plt.title("Mean Num Actions Ratio by Map Type")
+	plt.xticks(x, labels, fontsize=20)
+	plt.ylabel("Mean Ratio (baseline / ours)", fontname='Times New Roman', fontsize=20)
+	plt.title("Mean Num Actions Ratio by Map Type", fontname='Times New Roman', fontsize=20)
+	plt.yticks(fontsize=20)
 	for i, m in enumerate(means):
-		plt.text(i, m + 0.02, f"{m:.2f}", ha='center', va='bottom')
+		plt.text(i, m + 0.02, f"{m:.2f}", ha='center', va='bottom', fontname='Times New Roman', fontsize=20)
 	plt.tight_layout()
 	out_path = os.path.join(RESULTS_DIR, "num_actions_ratio_means.png")
-	plt.savefig(out_path, dpi=400)
+	plt.savefig(out_path, dpi=100)
 	print(f"Saved mean ratio bar plot to {out_path}")
 
 
@@ -199,7 +206,18 @@ def plot_absolute_actions(action_counts):
 	order_index = {mt: i for i, mt in enumerate(MAP_TYPE_PREFIXES + ["other"])}
 	entries.sort(key=lambda x: (order_index.get(x[0], 999), x[1], x[2]))
 
-	testcase_names = [e[2] for e in entries]
+	testcase_names = []
+	for i in range(len(entries)):
+		e = entries[i]
+		if e[0] == 'mixed':
+			name = f"mixed_12objects"
+		elif e[0] == 'cycled':
+			name = f"single_cycle_{e[1]}objects"
+		elif e[0] == 'double_cycled':
+			name = f"double_cycle_{e[1]}objects"
+		elif e[0] == 'random':
+			name = f"random_{e[1]}objects"
+		testcase_names.append(name)
 	baseline_vals = [e[3] for e in entries]
 	ours_vals = [e[4] for e in entries]
 
@@ -210,14 +228,18 @@ def plot_absolute_actions(action_counts):
 	plt.figure(figsize=(18, 6))
 	plt.bar(x - width/2, baseline_vals, width, label='Baseline', color='gray')
 	plt.bar(x + width/2, ours_vals, width, label='Ours', color='blue')
-	plt.ylabel('Number of Actions')
-	plt.xlabel('Test Cases')
-	plt.title('Absolute Number of Actions per Test Case')
-	plt.xticks(x, testcase_names, rotation=45, ha='right')
-	plt.legend()
+	plt.ylabel('Number of Actions', fontname='Times New Roman', fontsize=20)
+	# plt.xlabel('Test Cases', fontname='Times New Roman', fontsize=20)
+	plt.title('Absolute Number of Actions per Test Case', fontname='Times New Roman', fontsize=20)
+	plt.xticks(x, testcase_names, rotation=45, ha='right', fontsize=15)
+	plt.yticks(fontsize=20)
+	leg = plt.legend(fontsize=15, loc='upper left')
+	for text in leg.get_texts():
+		text.set_fontname('Times New Roman')
+		text.set_fontsize(15)
 	plt.tight_layout()
 	out_path = os.path.join(RESULTS_DIR, 'num_actions_absolute_barplot.png')
-	plt.savefig(out_path, dpi=400)
+	plt.savefig(out_path, dpi=100)
 	print(f"Saved absolute actions bar plot to {out_path}")
 
 
@@ -230,7 +252,7 @@ def main():
 		for k in list(per_testcase.keys())[:10]:
 			print(f"  {k}: {per_testcase[k]:.3f}")
 	plot_boxplot(ratios_by_type)
-	plot_mean_bars(ratios_by_type)
+	# plot_mean_bars(ratios_by_type)
 	plot_absolute_actions(data)
 
 

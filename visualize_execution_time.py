@@ -1,6 +1,8 @@
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.size'] = 20
 
 data_folder = "data"
 results_folder = "results"
@@ -10,6 +12,14 @@ ignore_baseline_for_double_cycled = True
 # Define fixed order of testcase types
 testcase_types_order = ["mixed", "cycled", "double_cycled", "random"]
 methods = ["ours", "baseline", "baseline_with_our_tp", "ours_with_baseline_tp", "our_tp_with_curobo"]
+method_display_names = {
+    "ours": "Ours",
+    "baseline": "Baseline",
+    "baseline_with_our_tp": "Baseline+Our TP",
+    "ours_with_baseline_tp": "Ours+Baseline TP",
+    "our_tp_with_curobo": "Our TP+Curobo"
+}
+
 colors = {
     "baseline": "gray",
     "ours": "blue",
@@ -98,20 +108,25 @@ ours_times = [case["ours"] for case in sorted_cases]
 # Step 4: Plot
 fig, ax = plt.subplots(figsize=(18, 6))
 ax.bar(baseline_x, baseline_times, width, label="Baseline", color=colors["baseline"])
-ax.bar(tp_x, tp_times, width, label="Baseline w/ Our TP", color=colors["baseline_with_our_tp"])
-ax.bar(ours_tp_x, ours_tp_times, width, label="Ours w/ Baseline TP", color=colors["ours_with_baseline_tp"])
-ax.bar(our_tp_with_curobo_x, our_tp_with_curobo_times, width, label="Our TP w/ Curobo", color=colors["our_tp_with_curobo"])
+ax.bar(tp_x, tp_times, width, label="Baseline+Our TP", color=colors["baseline_with_our_tp"])
+ax.bar(ours_tp_x, ours_tp_times, width, label="Ours+Baseline TP", color=colors["ours_with_baseline_tp"])
+ax.bar(our_tp_with_curobo_x, our_tp_with_curobo_times, width, label="Our TP+Curobo", color=colors["our_tp_with_curobo"])
 ax.bar(ours_x, ours_times, width, label="Ours", color=colors["ours"])
 
 
-ax.set_xlabel("Test Cases")
-ax.set_ylabel("Execution Time (s)")
-ax.set_title("Execution Time Comparison: Ours vs Baselines")
+ax.set_xlabel("Test Cases", fontname='Times New Roman', fontsize=20)
+ax.set_ylabel("Execution Time (s)", fontname='Times New Roman', fontsize=20)
+ax.set_title("Execution Time Comparison: Ours vs Baselines", fontname='Times New Roman', fontsize=20)
 ax.set_xticks(x)
-ax.set_xticklabels(testcase_names, rotation=45, ha="right")
-ax.legend()
+ax.set_xticklabels(testcase_names, rotation=45, ha="right", fontname='Times New Roman', fontsize=20)
+ax.yaxis.set_tick_params(labelsize=20)
+ax.xaxis.set_tick_params(labelsize=20)
+leg = ax.legend(fontsize=20, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=5)
+for text in leg.get_texts():
+    text.set_fontname('Times New Roman')
+    text.set_fontsize(20)
 plt.tight_layout()
-plt.savefig("results/execution_time_comparison.png", dpi=500)
+plt.savefig("results/execution_time_comparison.png", dpi=100)
 print("Plot saved as results/execution_time_comparison.png")
 # plt.show()
 
@@ -134,17 +149,20 @@ bar_x = np.arange(len(methods))
 bar_heights = [success_rates[method] for method in methods]
 bar_colors = [colors[method] for method in methods]
 
-ax.bar(bar_x, bar_heights, color=bar_colors, tick_label=methods)
+ax.bar(bar_x, bar_heights, color=bar_colors, tick_label=[method_display_names[m] for m in methods])
 ax.set_ylim(0, 1.05)
-ax.set_ylabel("Success Rate")
-ax.set_title("Success Rate by Method")
+ax.set_ylabel("Success Rate", fontname='Times New Roman', fontsize=20)
+ax.set_title("Success Rate by Method", fontname='Times New Roman', fontsize=20)
+ax.xaxis.set_tick_params(labelsize=15)
+ax.yaxis.set_tick_params(labelsize=15)
 
 # Annotate bar values
 for i, rate in enumerate(bar_heights):
-    ax.text(i, rate + 0.02, f"{rate:.2f}", ha='center', va='bottom')
+    # Place annotation inside the bar, with smaller font and white color
+    ax.text(i, rate - 0.07, f"{rate:.2f}", ha='center', va='top', fontname='Times New Roman', fontsize=20, color='white')
 
 plt.tight_layout()
-plt.savefig("results/success_rate_comparison.png", dpi=500)
+plt.savefig("results/success_rate_comparison.png", dpi=100)
 print("Plot saved as results/success_rate_comparison.png")
 
 # Step 6: Execution Time Ratios vs Ours
@@ -165,9 +183,10 @@ for case in sorted_cases:
 labels = list(ratio_data.keys())
 data = [ratio_data[method] for method in labels]
 box_colors = [colors[method] for method in labels]
+labels = [method_display_names[m] for m in labels]
 
 fig, ax = plt.subplots(figsize=(10, 5))
-box = ax.boxplot(data, patch_artist=True, labels=labels)
+box = ax.boxplot(data, patch_artist=True, labels=labels, medianprops=dict(color='black', linewidth=2))
 
 # Color each box
 for patch, color in zip(box['boxes'], box_colors):
@@ -175,9 +194,11 @@ for patch, color in zip(box['boxes'], box_colors):
 
 ax.axhline(y=1.0, color='red', linestyle='--', linewidth=1)
 
-ax.set_ylabel("Execution Time Ratio (Method / Ours)")
-ax.set_title("Execution Time Ratio Compared to Ours")
+ax.set_ylabel("Execution Time Ratio", fontname='Times New Roman', fontsize=20)
+ax.set_title("Execution Time Ratio Compared to Ours", fontname='Times New Roman', fontsize=20)
+ax.xaxis.set_tick_params(labelsize=20)
+ax.yaxis.set_tick_params(labelsize=20)
 plt.tight_layout()
-plt.savefig("results/execution_time_ratios_boxplot.png", dpi=500)
+plt.savefig("results/execution_time_ratios_boxplot.png", dpi=100)
 print("Plot saved as results/execution_time_ratios_boxplot.png")
 # plt.show()
