@@ -70,16 +70,21 @@ if __name__ == "__main__":
         # Call our method
         dual_arm_env = DualArmEnv(task, headless=False, batch_size=3, num_buffers=20, pure_curobo=False)
         plan = dual_arm_env.plan()
+        # write time stats to file
+        base_name = os.path.splitext(os.path.basename(args.input))[0]
+        with open(os.path.join("results", f"{base_name}_{args.method}_time_stats.json"), "w") as f:
+            json.dump(dual_arm_env.time_stats, f, indent=4)
+            print(f"Time stats saved to results/{base_name}_{args.method}_time_stats.json")
 
-    if plan is None:
-        print("No plan found.")
-        exit(1)
+    # if plan is None:
+    #     print("No plan found.")
+    #     exit(1)
 
-    duration = get_duration(plan)
-    print("Plan duration:", duration)
-    base_name = os.path.splitext(os.path.basename(args.input))[0]
-    output_filename = os.path.join("results", f"{base_name}_{args.method}_duration.txt")
-    with open(output_filename, "w") as file:
-        file.write(f"{duration}\n")
-    # Save the plan
-    save_plan(plan, args.input, args.method)
+    # duration = get_duration(plan)
+    # print("Plan duration:", duration)
+    # base_name = os.path.splitext(os.path.basename(args.input))[0]
+    # output_filename = os.path.join("results", f"{base_name}_{args.method}_duration.txt")
+    # with open(output_filename, "w") as file:
+    #     file.write(f"{duration}\n")
+    # # Save the plan
+    # save_plan(plan, args.input, args.method)

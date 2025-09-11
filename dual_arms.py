@@ -102,6 +102,7 @@ class DualArmEnv:
         self.max_velocity = 0.314 * 5
         self.interpolation_dt = 0.02
         self.simulation_dt = 1/200
+        self.time_stats = {}
 
         single_motion_gen_config = MotionGenConfig.load_from_robot_config(
             self.robot_cfg,
@@ -976,6 +977,7 @@ class DualArmEnv:
         return True
     
     def filter_task_plans(self, task_plan: TaskPlan):
+        start = time.time()
         if task_plan.start_goal_pairs is not None and not task_plan.use_buffer:
             print("Pick two from the start_goal_pairs")
             self.find_available_task(task_plan)
@@ -995,6 +997,8 @@ class DualArmEnv:
             # elif (not task_plan.arm1_to_start) and (not task_plan.arm2_to_start):
             else:
                 print("Finishing up for both arms")
+        end = time.time()
+        self.time_stats.setdefault('filter_task_plan_time', []).append(end - start)
         return task_plan
 
     def task_plan(self, task_plan: TaskPlan = None):
@@ -1004,12 +1008,21 @@ class DualArmEnv:
 
     def plan(self):
         self.reset()
+        self.time_stats = {}
+        overall_start_time = time.time()
         while not self.task.finished():
+            start_time = time.time()
             task_plan = self.task_plan()
+            end_time = time.time()
+            self.time_stats.setdefault('task_planning_time', []).append(end_time - start_time)
+            start_time = time.time()
             task_execution_result = self.motion_plan(task_plan)
+            end_time = time.time()
+            self.time_stats.setdefault('motion_planning_time', []).append(end_time - start_time)
             if task_execution_result is None:
                 print("Motion planning failed.")
                 return None
+            update_start = time.time()
             self.old_task_plan = task_plan
             idx_to_sync = list(range(self.task.num_objects))
             sync_after_open = False
@@ -1052,6 +1065,10 @@ class DualArmEnv:
 
             self.check_object_collision_enabled()
             self.task.update(task_execution_result)
+            update_end = time.time()
+            self.time_stats.setdefault('task_update_time', []).append(update_end - update_start)
+        overall_end_time = time.time()
+        self.time_stats['overall_time'] = overall_end_time - overall_start_time
         return self.recorded_plan
     
     def plan_all(self)->List[TaskPlan]:
@@ -1582,6 +1599,7 @@ class DualArmEnv:
         cmd_plan = JointState.from_position(traj, self.j_names_primary)
         valid = self.traj_collision_check(cmd_plan)
         print(f"move_ee: valid = {valid}")
+        # valid = True
         return cmd_plan, valid
     
     def move_z(self, delta, angle1, angle2):
