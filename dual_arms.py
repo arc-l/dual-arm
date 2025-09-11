@@ -743,7 +743,8 @@ class DualArmEnv:
 
         task_execution_result = self.get_task_execution_result(task_plan)
 
-        if task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object is not None and not needs_naive_plan:
+        # if task_plan.arm1_assigned_object is not None and task_plan.arm2_assigned_object is not None and not needs_naive_plan:
+        if not needs_naive_plan:
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
             if not result.success:
                 print("Failed to go to start position, using naive waypoints")

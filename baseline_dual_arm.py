@@ -209,11 +209,15 @@ class Baseline(DualArmEnv):
                 arm2_object = action_list[1][i][0]
             else:
                 arm2_object = None
+            
+            # if arm1_object is not None and arm2_object is None:
+            #     arm2_object = arm1_object
+            #     arm1_object = None
 
             task_plan_to_start = TaskPlan(
                 start_goal_pairs=None if (arm1_object is None or arm2_object is None) else [(arm1_object, arm2_object)],
                 arm1_assigned_object=arm1_object if arm1_object is not None else None,
-                arm2_assigned_object=arm2_object if arm1_object is not None else None,
+                arm2_assigned_object=arm2_object if arm2_object is not None else None,
                 arm1_gripper_action=GripperAction.CLOSE,
                 arm2_gripper_action=GripperAction.CLOSE,
                 arm1_to_start=True,
@@ -240,7 +244,7 @@ class Baseline(DualArmEnv):
             task_plan_to_goal = TaskPlan(
                 start_goal_pairs=None if (arm1_object is None or arm2_object is None) else [(arm1_object, arm2_object)],
                 arm1_assigned_object=arm1_object if arm1_object is not None else arm2_object,
-                arm2_assigned_object=arm2_object if arm1_object is not None else None,
+                arm2_assigned_object=arm2_object if arm2_object is not None else None,
                 arm1_gripper_action=GripperAction.OPEN,
                 arm2_gripper_action=GripperAction.OPEN,
                 arm1_angle = task_plan_to_start.arm1_angle,

@@ -15,10 +15,10 @@ methods = ["ours", "baseline", "baseline_with_our_tp", "ours_with_baseline_tp", 
 method_display_names = {
     "ours": "Ours",
     "baseline": "Baseline",
-    "baseline_with_our_tp": "Baseline+Our TP",
-    "ours_with_baseline_tp": "Ours+Baseline TP",
-    "our_tp_with_curobo": "Our TP+Curobo",
-    "baseline_tp_with_curobo": "Baseline TP+Curobo"
+    "baseline_with_our_tp": "Baseline+\nOur TP",
+    "ours_with_baseline_tp": "Ours+\nBaseline TP",
+    "our_tp_with_curobo": "Our TP+\nCurobo",
+    "baseline_tp_with_curobo": "Baseline TP+\nCurobo"
 }
 
 colors = {
@@ -155,13 +155,13 @@ ax.bar(bar_x, bar_heights, color=bar_colors, tick_label=[method_display_names[m]
 ax.set_ylim(0, 1.05)
 ax.set_ylabel("Success Rate", fontname='Times New Roman', fontsize=20)
 ax.set_title("Success Rate by Method", fontname='Times New Roman', fontsize=20)
-ax.xaxis.set_tick_params(labelsize=15)
-ax.yaxis.set_tick_params(labelsize=15)
+ax.xaxis.set_tick_params(labelsize=20)
+ax.yaxis.set_tick_params(labelsize=20)
 
 # Annotate bar values
 for i, rate in enumerate(bar_heights):
     # Place annotation inside the bar, with smaller font and white color
-    ax.text(i, rate - 0.07, f"{rate:.2f}", ha='center', va='top', fontname='Times New Roman', fontsize=20, color='white')
+    ax.text(i, rate - 0.03, f"{rate:.2f}", ha='center', va='top', fontname='Times New Roman', fontsize=20, color='white')
 
 plt.tight_layout()
 plt.savefig("results/success_rate_comparison.png", dpi=100)
