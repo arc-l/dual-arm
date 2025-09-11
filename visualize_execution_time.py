@@ -30,6 +30,14 @@ colors = {
     "baseline_tp_with_curobo": "brown"
 }
 
+type_short = {
+    "mixed": "M",
+    "cycled": "S",
+    "double_cycled": "D",
+    "random": "R",
+    "other": "O"
+}
+
 # Helper to extract number of objects from testcase name
 def extract_num_objects(name):
     parts = name.split("_")
@@ -37,6 +45,19 @@ def extract_num_objects(name):
         if part.isdigit():
             return int(part)
     return 0
+
+def get_type_short(name):
+    parts = name.split('_')
+    if len(parts) >= 2 and parts[0] == 'double' and parts[1] == 'cycled':
+        return 'D'
+    elif parts[0] == 'mixed':
+        return 'M'
+    elif parts[0] == 'cycled':
+        return 'S'
+    elif parts[0] == 'random':
+        return 'R'
+    else:
+        return 'O'
 
 # Step 1: Process each JSON testcase
 for filename in os.listdir(data_folder):
@@ -85,13 +106,14 @@ for t_type in testcase_types_order:
         )
 
 # Step 3: Prepare data for plotting
-testcase_names = [case["name"] for case in sorted_cases]
+testcase_names = [f"{get_type_short(case['name'])}{case['num_objects']}" for case in sorted_cases]
 group_spacing = 1.2  # or try 1.5 for even more spacing
 x = np.arange(len(testcase_names)) * group_spacing
 width = 0.2
 
 # Bar positions
-baseline_x = x - 2 * width
+baseline_x = x - 2.5 * width
+baseline_tp_with_curobo_x = x - 2 * width
 tp_x = x - width
 ours_tp_x = x
 our_tp_with_curobo_x = x + width
@@ -101,6 +123,7 @@ ours_x = x + 2 * width
 
 # Get times
 baseline_times = [case["baseline"] for case in sorted_cases]
+baseline_tp_with_curobo_times = [case["baseline_tp_with_curobo"] for case in sorted_cases]
 tp_times = [case["baseline_with_our_tp"] for case in sorted_cases]
 ours_tp_times = [case["ours_with_baseline_tp"] for case in sorted_cases]
 our_tp_with_curobo_times = [case["our_tp_with_curobo"] for case in sorted_cases]
@@ -108,22 +131,22 @@ ours_times = [case["ours"] for case in sorted_cases]
 
 
 # Step 4: Plot
-fig, ax = plt.subplots(figsize=(18, 6))
+fig, ax = plt.subplots(figsize=(25, 6))
 ax.bar(baseline_x, baseline_times, width, label="Baseline", color=colors["baseline"])
+ax.bar(baseline_tp_with_curobo_x, baseline_tp_with_curobo_times, width, label="Baseline TP+Curobo", color=colors["baseline_tp_with_curobo"])
 ax.bar(tp_x, tp_times, width, label="Baseline+Our TP", color=colors["baseline_with_our_tp"])
 ax.bar(ours_tp_x, ours_tp_times, width, label="Ours+Baseline TP", color=colors["ours_with_baseline_tp"])
 ax.bar(our_tp_with_curobo_x, our_tp_with_curobo_times, width, label="Our TP+Curobo", color=colors["our_tp_with_curobo"])
 ax.bar(ours_x, ours_times, width, label="Ours", color=colors["ours"])
 
 
-ax.set_xlabel("Test Cases", fontname='Times New Roman', fontsize=20)
+# ax.set_xlabel("Test Cases", fontname='Times New Roman', fontsize=20)
 ax.set_ylabel("Execution Time (s)", fontname='Times New Roman', fontsize=20)
-ax.set_title("Execution Time Comparison: Ours vs Baselines", fontname='Times New Roman', fontsize=20)
 ax.set_xticks(x)
-ax.set_xticklabels(testcase_names, rotation=45, ha="right", fontname='Times New Roman', fontsize=20)
+ax.set_xticklabels(testcase_names, fontname='Times New Roman', fontsize=15)
 ax.yaxis.set_tick_params(labelsize=20)
-ax.xaxis.set_tick_params(labelsize=20)
-leg = ax.legend(fontsize=20, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=5)
+ax.xaxis.set_tick_params(labelsize=16)
+leg = ax.legend(fontsize=20, loc='upper center', ncol=6)
 for text in leg.get_texts():
     text.set_fontname('Times New Roman')
     text.set_fontsize(20)
@@ -154,7 +177,6 @@ bar_colors = [colors[method] for method in methods]
 ax.bar(bar_x, bar_heights, color=bar_colors, tick_label=[method_display_names[m] for m in methods])
 ax.set_ylim(0, 1.05)
 ax.set_ylabel("Success Rate", fontname='Times New Roman', fontsize=20)
-ax.set_title("Success Rate by Method", fontname='Times New Roman', fontsize=20)
 ax.xaxis.set_tick_params(labelsize=20)
 ax.yaxis.set_tick_params(labelsize=20)
 
@@ -197,7 +219,6 @@ for patch, color in zip(box['boxes'], box_colors):
 ax.axhline(y=1.0, color='red', linestyle='--', linewidth=1)
 
 ax.set_ylabel("Execution Time Ratio", fontname='Times New Roman', fontsize=20)
-ax.set_title("Execution Time Ratio Compared to Ours", fontname='Times New Roman', fontsize=20)
 ax.xaxis.set_tick_params(labelsize=20)
 ax.yaxis.set_tick_params(labelsize=20)
 plt.tight_layout()

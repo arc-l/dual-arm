@@ -124,9 +124,15 @@ def plot_boxplot(ratios_by_type):
 		return
 	labels = []
 	data = []
+	label_to_display = {
+		'mixed': 'Mixed',
+		'cycled': 'Single Cycle',
+		'double_cycled': 'Double Cycle',
+		'random': 'Random'
+	}
 	for mt in MAP_TYPE_PREFIXES + ["other"]:
 		if mt in ratios_by_type and ratios_by_type[mt]:
-			labels.append(mt)
+			labels.append(label_to_display.get(mt, mt))
 			data.append(ratios_by_type[mt])
 
 	if not data:
@@ -135,11 +141,11 @@ def plot_boxplot(ratios_by_type):
 
 	plt.figure(figsize=(10, 5))
 	main_colors = {
-		'mixed': 'red',
-		'cycled': 'green',
-		'double_cycled': 'blue',
-		'random': 'orange',
-		'other': 'gray'
+		'Mixed': 'red',
+		'Single Cycle': 'green',
+		'Double Cycle': 'blue',
+		'Random': 'orange',
+		'Other': 'gray'
 	}
 	import matplotlib.colors as mcolors
 	def lighten(color, amount=0.5):
@@ -151,7 +157,8 @@ def plot_boxplot(ratios_by_type):
 		patch.set_facecolor(lighten(base_color, 0.5))
 	plt.axhline(1.0, color='red', linestyle='--', linewidth=1)
 	plt.ylabel("Num Actions Ratio (baseline / ours)", fontname='Times New Roman', fontsize=20)
-	plt.title("Baseline vs Ours: Num Actions Ratio by Map Type", fontname='Times New Roman', fontsize=20)
+	# Remove title
+	# plt.title("Baseline vs Ours: Num Actions Ratio by Map Type", fontname='Times New Roman', fontsize=20)
 	plt.xticks(fontsize=20)
 	plt.yticks(fontsize=20)
 	plt.tight_layout()
@@ -181,7 +188,8 @@ def plot_mean_bars(ratios_by_type):
 	plt.axhline(1.0, color='red', linestyle='--', linewidth=1)
 	plt.xticks(x, labels, fontsize=20)
 	plt.ylabel("Mean Ratio (baseline / ours)", fontname='Times New Roman', fontsize=20)
-	plt.title("Mean Num Actions Ratio by Map Type", fontname='Times New Roman', fontsize=20)
+	# Remove title
+	# plt.title("Mean Num Actions Ratio by Map Type", fontname='Times New Roman', fontsize=20)
 	plt.yticks(fontsize=20)
 	for i, m in enumerate(means):
 		plt.text(i, m + 0.02, f"{m:.2f}", ha='center', va='bottom', fontname='Times New Roman', fontsize=20)
@@ -201,12 +209,12 @@ def extract_num_objects(testcase_name: str) -> int:
 
 
 def plot_absolute_actions(action_counts):
-	type_display = {
-		'mixed': 'mixed',
-		'cycled': 'single cycle',
-		'double_cycled': 'double cycle',
-		'random': 'random',
-		'other': 'other'
+	type_short = {
+		'mixed': 'M',
+		'cycled': 'S',
+		'double_cycled': 'D',
+		'random': 'R',
+		'other': 'O'
 	}
 	"""Grouped bar plot of absolute action counts per testcase (baseline vs ours)."""
 	entries = []  # list of (map_type, num_objects, testcase, baseline_cnt, ours_cnt)
@@ -242,14 +250,14 @@ def plot_absolute_actions(action_counts):
 		c = mcolors.to_rgb(color)
 		return mcolors.to_hex([v * amount for v in c])
 
-	testcase_names = [f"{type_display.get(e[0], e[0])}_{e[1]}_objects" for e in entries]
+	testcase_names = [f"{type_short.get(e[0], 'O')}{e[1]}" for e in entries]
 	baseline_vals = [e[3] for e in entries]
 	ours_vals = [e[4] for e in entries]
 	map_types = [e[0] for e in entries]
 
 	import numpy as np
 	x = np.arange(len(testcase_names))
-	width = 0.6
+	width = 1.0  # Remove gap between bars by setting width to 1.0
 
 	plt.figure(figsize=(max(10, len(testcase_names)*0.5), 6))
 	for idx in range(len(x)):
@@ -280,9 +288,9 @@ def plot_absolute_actions(action_counts):
 		text.set_fontsize(16)
 
 	plt.ylabel('Number of Actions', fontname='Times New Roman', fontsize=20)
-	# plt.xlabel('Test Cases', fontname='Times New Roman', fontsize=20)
-	plt.title('Absolute Number of Actions per Test Case', fontname='Times New Roman', fontsize=20)
-	plt.xticks(x, testcase_names, rotation=45, ha='right', fontsize=10)
+	# Remove title
+	# plt.title('Absolute Number of Actions per Test Case', fontname='Times New Roman', fontsize=20)
+	plt.xticks(x, testcase_names, fontsize=10)
 	plt.yticks(fontsize=20)
 	plt.tight_layout()
 	out_path = os.path.join(RESULTS_DIR, 'num_actions_absolute_barplot.png')
