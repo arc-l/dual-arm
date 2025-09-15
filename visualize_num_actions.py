@@ -282,15 +282,15 @@ def plot_absolute_actions(action_counts):
 	]
 	leg = plt.legend(handles=legend_elems, fontsize=10, loc='upper left', ncol=2, title='Type (lighter: Ours, darker: Baseline)', title_fontsize=10)
 	leg.get_title().set_fontname('Times New Roman')
-	leg.get_title().set_fontsize(16)
+	leg.get_title().set_fontsize(20)
 	for text in leg.get_texts():
 		text.set_fontname('Times New Roman')
-		text.set_fontsize(16)
+		text.set_fontsize(20)
 
 	plt.ylabel('Number of Actions', fontname='Times New Roman', fontsize=20)
 	# Remove title
 	# plt.title('Absolute Number of Actions per Test Case', fontname='Times New Roman', fontsize=20)
-	plt.xticks(x, testcase_names, fontsize=10)
+	plt.xticks(x, testcase_names, rotation=45, fontsize=20)
 	plt.yticks(fontsize=20)
 	plt.tight_layout()
 	out_path = os.path.join(RESULTS_DIR, 'num_actions_absolute_barplot.png')

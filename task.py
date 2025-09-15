@@ -1382,15 +1382,18 @@ def generate_dataset(num_samples: int, folder: str = 'data', object_size=0.05, c
 
 # debug
 if __name__ == '__main__':
-    # task = Task(6, 0.6, 0.6, 0.05) 
-    # # task.generate_running_example()
+    task = Task(6, 0.6, 0.6, 0.05) 
+    task.generate_running_example()
     # task.generate("mixed", clearance=0.05)
     # print("task.cycles: ", task.dependency_graph.get_cycles())
     # print("task.chains: ", task.dependency_graph.get_chains())
     # print("task.independent_sets: ", task.dependency_graph.get_independent_sets())
-    # task.draw_four_panel("results/four_panel.png")
-    # task.write_to_json("data/task_running_example.json")
+    task.write_to_json("data/task_running_example.json")
+    # task = Task.read_from_json("data/task_running_example.json")
+    task.draw_all("results/four_panel_running_example.png", overlay=True)
     # task.draw_triptych_to_ppt("results/test.pptx", slide_title="Running Example")
+    task.draw_start_goal_dependency_to_ppt("results/test2.pptx", slide_title="Start, Goal and Dependency Graph")
+    exit()
 
     task = Task.read_from_json("data/random_objects_18.json")
     task.draw_all("results/four_panel.png")

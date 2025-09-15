@@ -27,7 +27,7 @@ colors = {
     "baseline_with_our_tp": "green",
     "ours_with_baseline_tp": "orange",
     "our_tp_with_curobo": "purple",
-    "baseline_tp_with_curobo": "brown"
+    "baseline_tp_with_curobo": "magenta"
 }
 
 type_short = {
@@ -107,17 +107,17 @@ for t_type in testcase_types_order:
 
 # Step 3: Prepare data for plotting
 testcase_names = [f"{get_type_short(case['name'])}{case['num_objects']}" for case in sorted_cases]
-group_spacing = 1.2  # or try 1.5 for even more spacing
-x = np.arange(len(testcase_names)) * group_spacing
-width = 0.2
+n_cases = len(testcase_names)
+x = np.linspace(0, n_cases - 1, n_cases)
+width = 0.15  # Keep bars thick
 
 # Bar positions
 baseline_x = x - 2.5 * width
-baseline_tp_with_curobo_x = x - 2 * width
-tp_x = x - width
-ours_tp_x = x
-our_tp_with_curobo_x = x + width
-ours_x = x + 2 * width
+tp_x = x - 1.5 * width
+ours_tp_x = x - 0.5 * width
+our_tp_with_curobo_x = x + 0.5 * width
+baseline_tp_with_curobo_x = x + 1.5 * width
+ours_x = x + 2.5 * width
 
 
 
@@ -131,25 +131,27 @@ ours_times = [case["ours"] for case in sorted_cases]
 
 
 # Step 4: Plot
-fig, ax = plt.subplots(figsize=(25, 6))
+fig, ax = plt.subplots(figsize=(28, 6))
+ax.margins(x=0)
 ax.bar(baseline_x, baseline_times, width, label="Baseline", color=colors["baseline"])
-ax.bar(baseline_tp_with_curobo_x, baseline_tp_with_curobo_times, width, label="Baseline TP+Curobo", color=colors["baseline_tp_with_curobo"])
 ax.bar(tp_x, tp_times, width, label="Baseline+Our TP", color=colors["baseline_with_our_tp"])
 ax.bar(ours_tp_x, ours_tp_times, width, label="Ours+Baseline TP", color=colors["ours_with_baseline_tp"])
 ax.bar(our_tp_with_curobo_x, our_tp_with_curobo_times, width, label="Our TP+Curobo", color=colors["our_tp_with_curobo"])
+ax.bar(baseline_tp_with_curobo_x, baseline_tp_with_curobo_times, width, label="Baseline TP+Curobo", color=colors["baseline_tp_with_curobo"])
 ax.bar(ours_x, ours_times, width, label="Ours", color=colors["ours"])
 
 
 # ax.set_xlabel("Test Cases", fontname='Times New Roman', fontsize=20)
-ax.set_ylabel("Execution Time (s)", fontname='Times New Roman', fontsize=20)
+ax.set_ylabel("Execution Time (s)", fontname='Times New Roman', fontsize=25)
 ax.set_xticks(x)
-ax.set_xticklabels(testcase_names, fontname='Times New Roman', fontsize=15)
-ax.yaxis.set_tick_params(labelsize=20)
-ax.xaxis.set_tick_params(labelsize=16)
-leg = ax.legend(fontsize=20, loc='upper center', ncol=6)
+ax.set_xlim(-1, np.max(x) + 1)
+ax.set_xticklabels(testcase_names, rotation=45, fontname='Times New Roman', fontsize=25)
+ax.yaxis.set_tick_params(labelsize=25)
+ax.xaxis.set_tick_params(labelsize=25)
+leg = ax.legend(fontsize=25, loc='upper center', ncol=6)
 for text in leg.get_texts():
     text.set_fontname('Times New Roman')
-    text.set_fontsize(20)
+    text.set_fontsize(25)
 plt.tight_layout()
 plt.savefig("results/execution_time_comparison.png", dpi=100)
 print("Plot saved as results/execution_time_comparison.png")
