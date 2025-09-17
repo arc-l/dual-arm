@@ -13,11 +13,11 @@ ignore_baseline_for_double_cycled = True
 testcase_types_order = ["mixed", "cycled", "double_cycled", "random"]
 methods = ["ours", "baseline", "baseline_with_our_tp", "ours_with_baseline_tp", "our_tp_with_curobo", "baseline_tp_with_curobo"]
 method_display_names = {
-    "ours": "Ours",
+    "ours": "SDAR",
     "baseline": "Baseline",
-    "baseline_with_our_tp": "Baseline+\nOur TP",
-    "ours_with_baseline_tp": "Ours+\nBaseline TP",
-    "our_tp_with_curobo": "Our TP+\nCurobo",
+    "baseline_with_our_tp": "SDAR-T+\nBaseline MP",
+    "ours_with_baseline_tp": "Baseline TP+\nSDAR-M",
+    "our_tp_with_curobo": "SDAR-T+\nCurobo",
     "baseline_tp_with_curobo": "Baseline TP+\nCurobo"
 }
 
@@ -134,11 +134,11 @@ ours_times = [case["ours"] for case in sorted_cases]
 fig, ax = plt.subplots(figsize=(28, 6))
 ax.margins(x=0)
 ax.bar(baseline_x, baseline_times, width, label="Baseline", color=colors["baseline"])
-ax.bar(tp_x, tp_times, width, label="Baseline+Our TP", color=colors["baseline_with_our_tp"])
-ax.bar(ours_tp_x, ours_tp_times, width, label="Ours+Baseline TP", color=colors["ours_with_baseline_tp"])
-ax.bar(our_tp_with_curobo_x, our_tp_with_curobo_times, width, label="Our TP+Curobo", color=colors["our_tp_with_curobo"])
+ax.bar(tp_x, tp_times, width, label="SDAR-T+Baseline", color=colors["baseline_with_our_tp"])
+ax.bar(ours_tp_x, ours_tp_times, width, label="Baseline TP+SDAR-M", color=colors["ours_with_baseline_tp"])
+ax.bar(our_tp_with_curobo_x, our_tp_with_curobo_times, width, label="SDAR-T+Curobo", color=colors["our_tp_with_curobo"])
 ax.bar(baseline_tp_with_curobo_x, baseline_tp_with_curobo_times, width, label="Baseline TP+Curobo", color=colors["baseline_tp_with_curobo"])
-ax.bar(ours_x, ours_times, width, label="Ours", color=colors["ours"])
+ax.bar(ours_x, ours_times, width, label="SDAR", color=colors["ours"])
 
 
 # ax.set_xlabel("Test Cases", fontname='Times New Roman', fontsize=20)
@@ -171,7 +171,7 @@ for case in sorted_cases:
 success_rates = {method: success_counts[method] / total_cases for method in methods}
 
 # Plot success rate
-fig, ax = plt.subplots(figsize=(10, 5))
+fig, ax = plt.subplots(figsize=(10, 4))
 bar_x = np.arange(len(methods))
 bar_heights = [success_rates[method] for method in methods]
 bar_colors = [colors[method] for method in methods]
@@ -179,7 +179,7 @@ bar_colors = [colors[method] for method in methods]
 ax.bar(bar_x, bar_heights, color=bar_colors, tick_label=[method_display_names[m] for m in methods])
 ax.set_ylim(0, 1.05)
 ax.set_ylabel("Success Rate", fontname='Times New Roman', fontsize=20)
-ax.xaxis.set_tick_params(labelsize=20)
+ax.xaxis.set_tick_params(labelsize=17)
 ax.yaxis.set_tick_params(labelsize=20)
 
 # Annotate bar values

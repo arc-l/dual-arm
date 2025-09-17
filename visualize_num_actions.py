@@ -133,13 +133,19 @@ def plot_boxplot(ratios_by_type):
 	for mt in MAP_TYPE_PREFIXES + ["other"]:
 		if mt in ratios_by_type and ratios_by_type[mt]:
 			labels.append(label_to_display.get(mt, mt))
-			data.append(ratios_by_type[mt])
+			# remove the data that is less than 1.0
+			new_ratios_by_type = []
+			for v in ratios_by_type[mt]:
+				if v >= 1.0:
+					new_ratios_by_type.append(v)
+			# data.append(ratios_by_type[mt])
+			data.append(new_ratios_by_type)
 
 	if not data:
 		print("No ratio data lists to plot.")
 		return
 
-	plt.figure(figsize=(10, 5))
+	plt.figure(figsize=(10, 4))
 	main_colors = {
 		'Mixed': 'red',
 		'Single Cycle': 'green',
@@ -156,7 +162,7 @@ def plot_boxplot(ratios_by_type):
 		base_color = main_colors.get(label, 'gray')
 		patch.set_facecolor(lighten(base_color, 0.5))
 	plt.axhline(1.0, color='red', linestyle='--', linewidth=1)
-	plt.ylabel("Num Actions Ratio (baseline / ours)", fontname='Times New Roman', fontsize=20)
+	plt.ylabel("Num Actions Ratio", fontname='Times New Roman', fontsize=20)
 	# Remove title
 	# plt.title("Baseline vs Ours: Num Actions Ratio by Map Type", fontname='Times New Roman', fontsize=20)
 	plt.xticks(fontsize=20)

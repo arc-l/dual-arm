@@ -1251,19 +1251,19 @@ class Task:
     def draw_all(self, save_path=None, overlay=False):
         fig_num = 4 if overlay else 3
         fig, axes = plt.subplots(1, fig_num, figsize=(6 * fig_num, 6))
-        titles = ['Start Positions', 'Goal Positions', 'Start & Goal Overlay', 'Dependency Graph'] if overlay else ['Start Positions', 'Goal Positions', 'Dependency Graph']
-        goal_scale = 1.2
+        titles = ['Start Configurations', 'Goal Configurations', 'Start & Goal Overlay', 'Dependency Graph'] if overlay else ['Start Configurations', 'Goal Configurations', 'Dependency Graph']
+        goal_scale = 1.05
         scaled_size = self.object_size * goal_scale
         fig_cnt = 0
 
-        def draw_table(ax, title):
+        def draw_table(ax, title, facecolor='lightgray'):
             table_rect = patches.FancyBboxPatch(
                 (-self.map_width / 2, -self.map_length / 2),
                 self.map_width,
                 self.map_length,
                 boxstyle="round,pad=0.02",
                 edgecolor='black',
-                facecolor='lightgray',
+                facecolor=facecolor,
                 linewidth=2,
             )
             ax.add_patch(table_rect)
@@ -1274,7 +1274,7 @@ class Task:
             ax.set_xticks([])
             ax.set_yticks([])
 
-        def draw_objects(ax, positions, colors, size, hatch=None, label_prefix=""):
+        def draw_objects(ax, positions, colors, size, hatch=None, label_prefix="", label_show=True, label_fontsize=30, label_weight='normal'):
             for i, pos in positions.items():
                 color = colors[i]
                 lower_left = (pos[0] - size / 2, pos[1] - size / 2)
@@ -1285,31 +1285,61 @@ class Task:
                     hatch=hatch,
                     alpha=1.0
                 ))
-                ax.text(
-                    pos[0], pos[1], f"{label_prefix}{i}",
-                    color='black', fontsize=30,
-                    ha='center', va='center', fontname='Times New Roman'
-                )
+                if label_show:
+                    ax.text(
+                        pos[0], pos[1]-0.005, f"{label_prefix}{i}",
+                        color='black', fontsize=label_fontsize,
+                        ha='center', va='center', fontname='Times New Roman', fontweight=label_weight
+                    )
 
         for i, ax in enumerate(axes):
-            draw_table(ax, titles[i])
+            # For the dependency graph panel, use a very light gray background
+            if titles[i] == 'Dependency Graph':
+                draw_table(ax, titles[i], facecolor='#f5f5f5')
+            else:
+                draw_table(ax, titles[i])
 
         # Start
-        draw_objects(axes[fig_cnt], self.start_dict, self.colors, self.object_size)
+        def _pixels_to_data_x(ax, px):
+            # Convert pixel width to data units along X
+            (x0_disp, y0_disp) = ax.transData.transform((0, 0))
+            (x1_data, _) = ax.transData.inverted().transform((x0_disp + px, y0_disp))
+            (x0_data, _) = ax.transData.inverted().transform((x0_disp, y0_disp))
+            return x1_data - x0_data
+
+        draw_objects(axes[fig_cnt], self.start_dict, self.colors, self.object_size, label_weight="bold")
         fig_cnt += 1
 
-        # Goal
-        draw_objects(axes[fig_cnt], self.goal_dict, self.colors, scaled_size, hatch='/')
+        # Goal: remove hatches; additionally, draw start configuration beneath (no labels/colors)
+        # Draw start outlines first (beneath goals)
+        start_px_inflate = _pixels_to_data_x(axes[fig_cnt], 2)
+        start_size_main = self.object_size + start_px_inflate
+        for i, pos in self.start_dict.items():
+            lower_left = (pos[0] - start_size_main / 2, pos[1] - start_size_main / 2)
+            axes[fig_cnt].add_patch(patches.Rectangle(
+                lower_left, scaled_size, scaled_size,
+                facecolor='white', edgecolor='white', linewidth=2.0, alpha=1.0, zorder=1
+            ))
+        # Now draw goals on top, no hatches
+        draw_objects(axes[fig_cnt], self.goal_dict, self.colors, self.object_size * 0.95, hatch=None, label_prefix="", label_show=True, label_fontsize=30, label_weight='bold')
         fig_cnt += 1
 
         # Overlay
         if overlay:
             draw_objects(axes[fig_cnt], self.goal_dict, self.colors, scaled_size, hatch='/', label_prefix='G')
-            draw_objects(axes[fig_cnt], self.start_dict, self.colors, self.object_size, label_prefix='S')
+            start_px_inflate_ov = _pixels_to_data_x(axes[fig_cnt], 2)
+            start_size_ov = self.object_size + start_px_inflate_ov
+            draw_objects(axes[fig_cnt], self.start_dict, self.colors, start_size_ov, label_prefix='S')
             fig_cnt += 1
 
-        # Dependency Graph
-        draw_objects(axes[fig_cnt], self.start_dict, self.colors, self.object_size)
+        # Dependency Graph: draw circular nodes with larger bold labels
+        node_radius = self.object_size / 2 * 1.1 
+        for i, pos in self.start_dict.items():
+            color = self.colors[i]
+            circ = patches.Circle((pos[0], pos[1]), radius=node_radius, facecolor=color, edgecolor='black', alpha=1.0)
+            axes[fig_cnt].add_patch(circ)
+            axes[fig_cnt].text(pos[0], pos[1]-0.005, f"{i}", color='black', fontsize=30, fontweight='bold',
+                               ha='center', va='center', fontname='Times New Roman')
 
         # Build a mapping from edge to color based on cycles
         edge_color_map = {}
@@ -1335,26 +1365,26 @@ class Task:
             for interfering in interfering_set:
                 source = self.start_dict[interfering]
 
-                dx, dy = dest[0] - source[0], dest[1] - source[1]
-                if abs(dx) > abs(dy):
-                    src_edge = (source[0] + self.object_size/2 * (1 if dx > 0 else -1), source[1])
-                    dst_edge = (dest[0] - self.object_size/2 * (1 if dx > 0 else -1), dest[1])
-                else:
-                    src_edge = (source[0], source[1] + self.object_size/2 * (1 if dy > 0 else -1))
-                    dst_edge = (dest[0], dest[1] - self.object_size/2 * (1 if dy > 0 else -1))
+                # For circular nodes, compute edge points along the line connecting centers
+                vec = np.array([dest[0] - source[0], dest[1] - source[1]])
+                norm = np.linalg.norm(vec) if np.linalg.norm(vec) != 0 else 1.0
+                direction = vec / norm
+                src_edge = (source[0] + direction[0] * node_radius, source[1] + direction[1] * node_radius)
+                dst_edge = (dest[0] - direction[0] * node_radius, dest[1] - direction[1] * node_radius)
 
                 # Color based on cycles
                 colors = edge_color_map.get((interfering, dependent), ['black'])
                 for color in colors:
-                    axes[fig_cnt].annotate("",
-                        xy=dst_edge, xycoords='data',
-                        xytext=src_edge, textcoords='data',
+                    axes[fig_cnt].annotate(
+                        "",
+                        xy=src_edge, xycoords='data',
+                        xytext=dst_edge, textcoords='data',
                         arrowprops=dict(
                             arrowstyle="->",
                             color=color,
                             lw=1.5,
                             mutation_scale=20,
-                            connectionstyle=f"arc3,rad={rad_color_dict[color]}"  # Your curve
+                            connectionstyle=f"arc3,rad={rad_color_dict[color]}"
                         )
                     )
     
@@ -1400,4 +1430,3 @@ if __name__ == '__main__':
     print("task.cycles: ", task.dependency_graph.get_cycles())
     print("task.chains: ", task.dependency_graph.get_chains())
     print("task.independent_sets: ", task.dependency_graph.get_independent_sets())
-

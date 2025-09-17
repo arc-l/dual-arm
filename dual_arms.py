@@ -1449,7 +1449,23 @@ class DualArmEnv:
             
             cmd_plan = self.get_plan_single(result)
             self.visualize_plan(cmd_plan)
-            cmd = self.move_z(0.3, 900, angle)
+            cmd, _ = self.move_z(-self.pre_grasp_height, 900, angle)
+            self.visualize_plan(cmd)
+            # Allow saving a screenshot of the current PyBullet frame by pressing 's'
+            while True:
+                user_in = input("Press Enter to continue, or 's' to save screenshot: ").strip().lower()
+                if user_in == "":
+                    break
+                if user_in == "s":
+                    try:
+                        path = self._save_pybullet_screenshot()
+                        print(f"Saved screenshot to: {path}")
+                    except Exception as e:
+                        print(f"Failed to save screenshot: {e}")
+                    continue
+                else:
+                    print("Unrecognized input. Press Enter to continue, or 's' to save screenshot.")
+            cmd, _ = self.move_z(0.3, 900, angle)
             self.visualize_plan(cmd)
 
         for angle in angles:
@@ -1462,8 +1478,62 @@ class DualArmEnv:
             
             cmd_plan = self.get_plan_single(result)
             self.visualize_plan(cmd_plan)
-            cmd = self.move_z(0.3, angle, 900)
+            cmd, _ = self.move_z(0.3, angle, 900)
             self.visualize_plan(cmd)
+
+    def _save_pybullet_screenshot(self, out_dir: str = os.path.join("results", "screenshots")) -> str:
+        """Save a screenshot of the current PyBullet debug visualizer view.
+
+        Returns the file path of the saved image.
+        """
+        if getattr(self, "_pb", None) is None:
+            raise RuntimeError("PyBullet client not initialized")
+        if self.headless:
+            raise RuntimeError("Screenshot not available in headless mode")
+
+        os.makedirs(out_dir, exist_ok=True)
+
+        cam_info = self._pb.getDebugVisualizerCamera()
+        # cam_info format: (width, height, viewMatrix, projectionMatrix, cameraUp, cameraForward,
+        #                   horizontal, vertical, yaw, pitch, dist, target)
+        width, height = int(cam_info[0]), int(cam_info[1])
+        view_matrix, proj_matrix = cam_info[2], cam_info[3]
+
+        img = self._pb.getCameraImage(
+            width,
+            height,
+            viewMatrix=view_matrix,
+            projectionMatrix=proj_matrix,
+            renderer=pybullet.ER_BULLET_HARDWARE_OPENGL,
+        )
+        # img: (w, h, rgba, depth, seg)
+        rgba = img[2]
+
+        # Convert to numpy array (H, W, 4)
+        if hasattr(rgba, "shape") and tuple(rgba.shape) == (height, width, 4):
+            arr = rgba
+        else:
+            arr = np.reshape(rgba, (height, width, 4))
+        rgb = arr[:, :, :3]
+
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        outfile = os.path.join(out_dir, f"pybullet_frame_{timestamp}.png")
+
+        # Try saving with PIL, fallback to matplotlib, else save as NPY
+        try:
+            from PIL import Image  # type: ignore
+            Image.fromarray(rgb).save(outfile)
+            return outfile
+        except Exception:
+            try:
+                import matplotlib.pyplot as plt  # type: ignore
+                plt.imsave(outfile, rgb)
+                return outfile
+            except Exception:
+                # Final fallback: save raw data for later conversion
+                npy_out = os.path.splitext(outfile)[0] + ".npy"
+                np.save(npy_out, rgb)
+                return npy_out
     
     def get_current_cube_pose(self):
         if self.headless:
@@ -1732,7 +1802,6 @@ if __name__ == '__main__':
     dual_arm = DualArmEnv(task,
                           False,
                           batch_size = 3,
-                          constrain_grasp_approach=False,
                           )
     dual_arm.reset()
     if test_grasp_angles:
