@@ -1768,7 +1768,7 @@ class DualArmEnv:
 
     def add_plan_to_record(self, cmd_plan:JointState|List):
         if isinstance(cmd_plan, list):
-                self.recorded_plan.append(cmd_plan)
+            self.recorded_plan.append(cmd_plan)
         else:
             assert cmd_plan.joint_names is not None
             self.recorded_plan.append(cmd_plan)

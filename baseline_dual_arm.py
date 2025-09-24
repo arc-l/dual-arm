@@ -82,7 +82,7 @@ class Baseline(DualArmEnv):
 
     @timeout_decorator.timeout(1000)
     def plan(self, use_our_tp=False, use_our_mp=False):
-        self.reset()
+        self.reset_isaac()
         start_arr, goal_arr = self.prepare_input()
         Height = 1000
         Width = 1000

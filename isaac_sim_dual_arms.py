@@ -72,11 +72,11 @@ class IsaacSimDualArms(DualArmEnv):
         super().__init__(task, batch_size=batch_size, headless=headless, num_buffers=num_buffers, pure_curobo=pure_curobo)
         self.simulation_app = simulation_app
         if simulation_app is None:
-            self.headless = True
+            self.headless_isaac = True
         else:
-            self.headless = False
+            self.headless_isaac = False
         
-        if not self.headless:
+        if not self.headless_isaac:
             self.world = World(stage_units_in_meters=1.0)
             self.stage = self.world.stage
             xform = self.stage.DefinePrim("/World", "Xform")
@@ -157,8 +157,8 @@ class IsaacSimDualArms(DualArmEnv):
             )
     
     def get_ready(self, reset=False, autostart=False):
-        if self.headless:
-            self.reset()
+        if self.headless_isaac:
+            self.reset_isaac()
             return
         i = 0
         while self.simulation_app.is_running():
@@ -173,7 +173,7 @@ class IsaacSimDualArms(DualArmEnv):
 
             step_index = self.world.current_time_step_index
             if step_index <= 2 or reset:
-                self.reset()
+                self.reset_isaac()
                 reset=False
 
             if step_index < 20:
@@ -206,7 +206,7 @@ class IsaacSimDualArms(DualArmEnv):
         return dict(zip(self.gripper_primary_joints, gripper_positions))
     
     def gripper_control_isaac(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
-        if self.headless:
+        if self.headless_isaac:
             self.gripper_closed[self.arm1] = bool(gripper1_action.value)
             self.gripper_closed[self.arm2] = bool(gripper2_action.value)
             return
@@ -260,9 +260,8 @@ class IsaacSimDualArms(DualArmEnv):
 
         self.gripper_control_isaac(GripperAction.OPEN, GripperAction.OPEN)
 
-    def reset(self):
-        super().reset()
-        if not self.headless:
+    def reset_isaac(self):
+        if not self.headless_isaac:
             self.world.reset()
             # set gravity
             physics_scene_path = "/physicsScene"
@@ -305,7 +304,7 @@ class IsaacSimDualArms(DualArmEnv):
             self.default_ee_pos[k] = t_pos[:3]
             self.default_ee_pos[k][2] += 0.15 #TODO: Test this, added 0.15m to z
         
-        if not self.headless:
+        if not self.headless_isaac:
             self.gripper_joint_indices = []
             for joint_name in self.gripper_joint_names:
                 dof_index = self.robot.get_dof_index(joint_name)
@@ -322,7 +321,7 @@ class IsaacSimDualArms(DualArmEnv):
         self.gripper_primary_joints_dict = {self.arm1: self.gripper_primary_joints[0], self.arm2: self.gripper_primary_joints[1]}
         self.gripper_primary_indices_dict = {self.arm1: None, self.arm2: None}
 
-        if not self.headless:
+        if not self.headless_isaac:
             for arm, joint_name in self.gripper_primary_joints_dict.items():
                 self.gripper_primary_indices_dict[arm] = self.robot.get_dof_index(joint_name)
             self.robot._articulation_view.set_gains(
@@ -343,17 +342,34 @@ class IsaacSimDualArms(DualArmEnv):
         if plan is None:
             print("Null JointState plan.")
             return
-        if self.headless:
+
+        if plan.joint_names != self.j_names_primary:
+            reordered = plan.get_ordered_joint_state(self.arm_joint_names)
+            positions = reordered.position
+            if positions.dim() == 1:
+                positions = positions.unsqueeze(0)
+            pad = torch.zeros(
+                (positions.shape[0], len(self.gripper_primary_joints)),
+                dtype=positions.dtype,
+                device=positions.device,
+            )
+            positions = torch.cat([positions, pad], dim=-1)
+            joint_names = list(self.arm_joint_names) + list(self.gripper_primary_joints)
+            plan = JointState.from_position(positions, joint_names)
+
+        if self.headless_isaac:
             cu_js = plan[-1].get_ordered_joint_state(self.j_names_primary)
             self.current_js = JointState.from_position(self.tensor_args.to_device(cu_js.position.reshape(1, -1)), self.j_names_primary)
-            return 
+            return
+
         cmd_idx = 0
         while self.simulation_app.is_running():
             self.world.step(render=True)
             if not self.world.is_playing():
                 continue
+
             cmd_state = plan[cmd_idx]
-            if cmd_state.joint_names == self.j_names_primary:
+            if cmd_state.joint_names != self.j_names_primary:
                 # cmd_state = cmd_state.get_ordered_joint_state(self.j_names_primary)
                 # cmd_state = self.single_motion_gen.get_full_js(cmd_state)
                 cmd_state = cmd_state.get_ordered_joint_state(self.common_js_names)
@@ -368,8 +384,6 @@ class IsaacSimDualArms(DualArmEnv):
 
             step_index = self.world.current_time_step_index
 
-            if self.visualize_spheres and step_index % 2 == 0:
-                self.visualize_robot_spheres()
             # set desired joint angles obtained from IK:
             self.articulation_controller.apply_action(art_action)
             cmd_idx += 1
@@ -433,13 +447,6 @@ class IsaacSimDualArms(DualArmEnv):
             else:
                 self.visualize_plan_isaac(section)
 
-    def add_plan_to_record(self, cmd_plan:JointState|List):
-        if isinstance(cmd_plan, list):
-            self.recorded_plan.append(cmd_plan)
-        else:
-            assert cmd_plan.joint_names is not None
-            self.recorded_plan.append(cmd_plan)
-    
     def fix_gripper(self, js: JointState):
         gripper_primary_pos_dict = self.get_primary_gripper_position_dict()
         positions = js.position.cpu().numpy()
