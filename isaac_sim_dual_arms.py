@@ -69,7 +69,7 @@ class IsaacSimDualArms(DualArmEnv):
             num_buffers: int = 20,
             pure_curobo: bool = False,
             ):
-        super().__init__(task, batch_size, headless, num_buffers, pure_curobo)
+        super().__init__(task, batch_size=batch_size, headless=headless, num_buffers=num_buffers, pure_curobo=pure_curobo)
         self.simulation_app = simulation_app
         if simulation_app is None:
             self.headless = True
@@ -205,7 +205,7 @@ class IsaacSimDualArms(DualArmEnv):
         gripper_positions = sim_js.positions[self.gripper_primary_indices]
         return dict(zip(self.gripper_primary_joints, gripper_positions))
     
-    def gripper_control(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
+    def gripper_control_isaac(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
         if self.headless:
             self.gripper_closed[self.arm1] = bool(gripper1_action.value)
             self.gripper_closed[self.arm2] = bool(gripper2_action.value)
@@ -239,28 +239,29 @@ class IsaacSimDualArms(DualArmEnv):
                 self.gripper_closed[self.arm2] = bool(gripper2_action.value)
                 break
             old_gripper_positions = new_gripper_positions
-    
-    def test_gripper_control(self):
+
+    def test_gripper_control_isaac(self):
         self.get_ready()
         for i in range(3):
-            self.gripper_control(GripperAction.CLOSE, GripperAction.OPEN)
-            self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
-        
-        for i in range(3):
-            self.gripper_control(GripperAction.OPEN, GripperAction.CLOSE)
-            self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
-        
-        for i in range(3):
-            self.gripper_control(GripperAction.CLOSE, GripperAction.CLOSE)
-            self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
-        
-        for i in range(3):
-            self.gripper_control(GripperAction.CLOSE, GripperAction.OPEN)
-            self.gripper_control(GripperAction.OPEN, GripperAction.CLOSE)
+            self.gripper_control_isaac(GripperAction.CLOSE, GripperAction.OPEN)
+            self.gripper_control_isaac(GripperAction.OPEN, GripperAction.OPEN)
 
-        self.gripper_control(GripperAction.OPEN, GripperAction.OPEN)
-    
+        for i in range(3):
+            self.gripper_control_isaac(GripperAction.OPEN, GripperAction.CLOSE)
+            self.gripper_control_isaac(GripperAction.OPEN, GripperAction.OPEN)
+
+        for i in range(3):
+            self.gripper_control_isaac(GripperAction.CLOSE, GripperAction.CLOSE)
+            self.gripper_control_isaac(GripperAction.OPEN, GripperAction.OPEN)
+
+        for i in range(3):
+            self.gripper_control_isaac(GripperAction.CLOSE, GripperAction.OPEN)
+            self.gripper_control_isaac(GripperAction.OPEN, GripperAction.CLOSE)
+
+        self.gripper_control_isaac(GripperAction.OPEN, GripperAction.OPEN)
+
     def reset(self):
+        super().reset()
         if not self.headless:
             self.world.reset()
             # set gravity
@@ -338,7 +339,7 @@ class IsaacSimDualArms(DualArmEnv):
         # self.sync_bullet_curobo()
         # print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
     
-    def visualize_plan(self, plan: JointState):
+    def visualize_plan_isaac(self, plan: JointState):
         if plan is None:
             print("Null JointState plan.")
             return
@@ -428,9 +429,9 @@ class IsaacSimDualArms(DualArmEnv):
         self.get_ready(reset=True)
         for section in recorded_plan:
             if type(section) == list:
-                self.gripper_control(section[0], section[1])
+                self.gripper_control_isaac(section[0], section[1])
             else:
-                self.visualize_plan(section)
+                self.visualize_plan_isaac(section)
 
     def add_plan_to_record(self, cmd_plan:JointState|List):
         if isinstance(cmd_plan, list):
@@ -438,13 +439,18 @@ class IsaacSimDualArms(DualArmEnv):
         else:
             assert cmd_plan.joint_names is not None
             self.recorded_plan.append(cmd_plan)
-
+    
+    def fix_gripper(self, js: JointState):
+        gripper_primary_pos_dict = self.get_primary_gripper_position_dict()
+        positions = js.position.cpu().numpy()
+        for arm, gripper_primary_name in self.gripper_primary_joints_dict.items():
+            idx = self.common_js_names.index(gripper_primary_name)
+            positions[idx] = gripper_primary_pos_dict[gripper_primary_name] + 0.002 * self.gripper_closed[arm]
+        return positions
+    
 
 if __name__ == "__main__":
     task = Task.read_from_json("data/random_objects_4.json")
     dual_arms_env = IsaacSimDualArms(task, simulation_app, headless=False, pure_curobo=False)
-    dual_arms_env.get_ready(autostart=True)
-    dual_arms_env.test_gripper_control()
-    dual_arms_env.reset()
-    dual_arms_env.test_gripper_control()
-    dual_arms_env.display()
+    plan = dual_arms_env.plan()
+    dual_arms_env.play(plan)

@@ -66,13 +66,15 @@
 
   <link name="base_link_1"/>
  
-      <!-- joints: main serial chain -->
+
+
+    <!-- joints: main serial chain -->
   <joint name="base_fixture_j_base_link" type="fixed">
     <parent link="base_fixture_link"/>
     <child link="base_link"/>
     <!-- <origin rpy=" 0 0 0" xyz="-0.05 0.0 0.0"/> -->
     <!-- <origin rpy=" 0 0 0" xyz="-0.55 -0.018056 0.0"/> -->
-    <origin rpy=" 0 0 0" xyz="-0.55 0 0.0"/>
+    <origin rpy="0 0 0" xyz="-0.55 0 0.0"/>
   </joint>
 
 
@@ -81,10 +83,11 @@
     <parent link="base_fixture_link"/>
     <child link="base_link_1"/>
     <!-- <origin rpy=" 0 0 0" xyz="1.05 0.015 0.0"/> -->
-    <origin rpy=" 0 0 0" xyz="0.5449 0.0 0.0"/>
+    <origin rpy=" 0 0 -3.105345355171964" xyz="0.5496187399999999 0.02588207 0.0"/>
   </joint>
 
 
+  
   <link name="base_link_inertia">
     <visual>
       <origin rpy="0 0 3.141592653589793" xyz="0 0 0"/>
@@ -503,8 +506,8 @@
            Use the joint between 'base_link' and 'base_link_inertia' (a dummy
            link/frame) to introduce the necessary rotation over Z (of pi rad).
       -->
-    <!-- <origin rpy="0 0 3.141592653589793" xyz="0 0 0"/> -->
-    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <origin rpy="0 0 3.141592653589793" xyz="0 0 0"/>
+    <!-- <origin rpy="0 0 0" xyz="0 0 0"/> -->
   </joint>
   <joint name="shoulder_pan_joint_1" type="revolute">
     <parent link="base_link_inertia_1"/>
@@ -672,28 +675,6 @@
       </geometry>
     </collision>
   </link>
-  <link name="left_inner_finger_pad">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-       <mass value="0.11"/>
-       <inertia ixx="1.0E-05" ixy="0" ixz="0" iyy="1.0E-05" iyz="0" izz="1.0E-06"/>
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.022 0.015 0.05"/>
-      </geometry>
-      <material name="Light09">
-        <color rgba="0.9 0.9 0.9 1"/>
-      </material>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.022 0.015 0.05"/>
-      </geometry>
-    </collision>
-  </link>
   <link name="left_inner_knuckle">
     <inertial>
         <origin xyz="0.000123011831763771 0.0507850843201817 0.00103968640075166" rpy="0 0 0" />
@@ -779,6 +760,30 @@
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="gripper/collision/robotiq_arg2f_85_inner_finger.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+
+  </link>
+
+  <link name="left_inner_finger_pad">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value="0.11"/>
+       <inertia ixx="1.0E-05" ixy="0" ixz="0" iyy="1.0E-05" iyz="0" izz="1.0E-06"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <box size="0.022 0.015 0.05"/>
+      </geometry>
+      <material name="Light09">
+        <color rgba="0.9 0.9 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <box size="0.022 0.015 0.05"/>
       </geometry>
     </collision>
   </link>
@@ -937,7 +942,7 @@
   <joint name="dummy_center_fixed_joint" type="fixed">
     <parent link="robotiq_arg2f_base_link"/>
     <child link="dummy_center_indicator_link"/>
-    <origin xyz="0 0 0.188"/>
+    <origin xyz="0 0 0.178"/>
   </joint>
 
   <!-- Hand 1 End -->
@@ -1285,7 +1290,7 @@
   <joint name="dummy_center_fixed_joint_1" type="fixed">
     <parent link="robotiq_arg2f_base_link_1"/>
     <child link="dummy_center_indicator_link_1"/>
-    <origin xyz="0 0 0.188"/>
+    <origin xyz="0 0 0.178"/>
   </joint>
   <!-- Hand 2 End -->
 
