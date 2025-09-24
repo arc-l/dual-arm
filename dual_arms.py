@@ -379,7 +379,7 @@ class DualArmEnv:
             for _ in range(200):
                 self._pb.stepSimulation()
             print("reset finished")
-        self.sync_isaacsim_curobo()
+        self.sync_bullet_curobo()
         print("self.single_motion_gen.world_coll_checker.get_obstacle_names() = ", self.single_motion_gen.world_coll_checker.get_obstacle_names())
 
     
@@ -728,7 +728,7 @@ class DualArmEnv:
         return task_execution_result
 
     def motion_plan(self, task_plan: TaskPlan, pre_grasp:bool=True):
-        needs_naive_plan = True
+        needs_naive_plan = False
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
         else:
@@ -770,8 +770,8 @@ class DualArmEnv:
         if needs_naive_plan:
             valid = self.naive_motion_plan(task_plan)
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
-            d_world, d_self = self.robot_world.get_world_self_collision_distance_from_joints(self.get_current_arm_js().position)
-            print(f"d_world={d_world}, d_self={d_self}")
+            # d_world, d_self = self.robot_world.get_world_self_collision_distance_from_joints(self.get_current_arm_js().position)
+            # print(f"d_world={d_world}, d_self={d_self}")
             if result.success:
                 cmd_plan = self.get_plan_single(result)
                 cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
@@ -1047,7 +1047,7 @@ class DualArmEnv:
             
             if sync_before_close:
                 # self.sync_isaacsim_curobo(idx_to_sync=idx_to_sync)
-                self.sync_isaacsim_curobo()
+                self.sync_bullet_curobo()
 
             idx_to_sync = list(range(self.task.num_objects))
             #TODO: Do I need to be concerned that the attaching and detaching happens after the gripper control in self.motion_plan()?
@@ -1087,7 +1087,7 @@ class DualArmEnv:
 
             if sync_after_open:
                 # self.sync_isaacsim_curobo(idx_to_sync=idx_to_sync)
-                self.sync_isaacsim_curobo()
+                self.sync_bullet_curobo()
 
             self.check_object_collision_enabled()
             self.task.update(task_execution_result)
@@ -1535,7 +1535,7 @@ class DualArmEnv:
             cube_positions.append(cube_position)
         return cube_positions 
 
-    def sync_isaacsim_curobo(self, idx_to_sync: list = None):
+    def sync_bullet_curobo(self, idx_to_sync: list = None):
         if idx_to_sync is None:
             idx_to_sync = list(range(self.task.num_objects))
         new_starts = {}

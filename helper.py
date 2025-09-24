@@ -3,6 +3,8 @@ import os
 from curobo.types.state import JointState
 import torch
 
+HEADLESS = False
+
 def joint_state_to_cpu(joint_state):
     """Convert all tensor attributes of a JointState to CPU."""
     position=joint_state.position.cpu() if isinstance(joint_state.position, torch.Tensor) else joint_state.position
