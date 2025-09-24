@@ -211,7 +211,7 @@ class IsaacSimDualArms(DualArmEnv):
             self.gripper_closed[self.arm2] = bool(gripper2_action.value)
             return
         dof_upper = self.robot.dof_properties["upper"]
-        gripper_closed_pos = dof_upper[self.gripper_primary_indices[0]]
+        gripper_closed_pos = dof_upper[self.gripper_primary_indices[0]] * 0.6
         gripper1_pos = gripper1_action.value * gripper_closed_pos
         gripper2_pos = gripper2_action.value * gripper_closed_pos
         gripper_primary_positions = self.get_primary_gripper_positions()
