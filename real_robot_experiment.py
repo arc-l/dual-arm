@@ -14,17 +14,33 @@ from helper import save_plan, load_plan
 def update_cube_poses_real2sim(camera:Camera):
     perception = Perception(camera=camera)
     perception.stream()
-    poses = perception.update_cube_poses(visualize=True)
-    print("poses=")
-    print(poses)
-    # for the poses, add 0.55 at y axis, then rotate 90 degrees around the z axis
-    for key, pose in poses.items():
-        pose[1] += 0.55  # Add 0.55 to the y axis
-        rotation_matrix = R.from_euler('z', 90, degrees=True).as_matrix()
+    # Capture poses 10 times; visualize only the first capture
+    pose_runs = []
+    for i in range(10):
+        # pose_runs.append(perception.update_cube_poses(visualize=(i == 0)))
+        pose_runs.append(perception.update_cube_poses(visualize=(i == 9)))
+
+    # Use intersection of keys to ensure consistent averaging
+    common_keys = set(pose_runs[0].keys())
+
+    # Average poses (in real frame) across runs
+    avg_poses = {}
+    for key in sorted(common_keys):
+        stack = np.stack([pr[key] for pr in pose_runs if key in pr], axis=0)
+        avg_poses[key] = stack.mean(axis=0)
+
+    print("poses (averaged)=")
+    print(avg_poses)
+
+    # Rotate 90 deg about Z, then subtract 0.55 on x, and set z to half cube height
+    rotation_matrix = R.from_euler('z', 90, degrees=True).as_matrix()
+    for key, pose in avg_poses.items():
+        pose[1] += 0.55
         rotated_pose = rotation_matrix @ pose
-        rotated_pose[2] = 0.038/2
-        poses[key] = rotated_pose
-    return poses
+        rotated_pose[2] = 0.038 / 2
+        avg_poses[key] = rotated_pose
+
+    return avg_poses
 
 def plan_process(plan):
     new_plan = []
@@ -40,7 +56,7 @@ def plan_process(plan):
             positions = p.position.cpu().numpy()
             arm1_positions = positions[:, :6]
             arm2_positions = positions[:, 6:]
-            arm1_positions[:, 0] += np.pi/2  # Add pi/2 to the base joint
+            arm1_positions[:, 0] += np.pi/2 #+ 2.0/180*np.pi  # Add pi/2 to the base joint
             arm1_positions[:, -1] -= np.pi/2
             arm2_positions[:, 0] += np.pi/2  # Add pi/2 to the base joint
             arm2_positions[:, -1] -= np.pi/2
@@ -61,8 +77,8 @@ def get_arrangement():
         'starts': [starts[key].tolist() for key in keys],
         'goals': [goals[key].tolist() for key in keys],
         "object_size": 0.038,
-        "map_width": 0.6,
-        "map_length": 0.6 }
+        "map_width": 0.45,
+        "map_length": 0.45 }
     with open("data/real_robot_experiment.json", 'w') as f:
         json.dump(data, f, indent=4)
 

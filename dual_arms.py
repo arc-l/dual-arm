@@ -123,7 +123,7 @@ class DualArmEnv:
             trajopt_tsteps = 32,
             # ik_opt_iters=1000,
             # rotation_threshold=0.5,
-            # position_threshold=0.5,
+            position_threshold=0.0005,
             finetune_trajopt_iters=500,
             high_precision=True,
         )
@@ -134,7 +134,7 @@ class DualArmEnv:
             self.robot_cfg,
             self.world_cfg_curobo,
             rotation_threshold=0.05,
-            position_threshold=0.005,
+            position_threshold=0.001,
             num_seeds=200,
             self_collision_check=True,
             self_collision_opt=True,
@@ -221,6 +221,10 @@ class DualArmEnv:
             self._pb.configureDebugVisualizer(self._pb.COV_ENABLE_RGB_BUFFER_PREVIEW, 0)
             self._pb.configureDebugVisualizer(self._pb.COV_ENABLE_DEPTH_BUFFER_PREVIEW, 0)
             self._pb.configureDebugVisualizer(self._pb.COV_ENABLE_SEGMENTATION_MARK_PREVIEW, 0)
+            # add x, y, z axis
+            self._pb.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], lineWidth=3, lifeTime=0)
+            self._pb.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], lineWidth=3, lifeTime=0)
+            self._pb.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], lineWidth=3, lifeTime=0)
 
             # target = self._pb.getDebugVisualizerCamera()
             self._pb.resetDebugVisualizerCamera(
@@ -262,6 +266,10 @@ class DualArmEnv:
             object_id_goal = self._pb.createMultiBody(baseMass=0, baseCollisionShapeIndex=-1, baseVisualShapeIndex=object_visual_goal, basePosition=[goals[i][0], goals[i][1], goal_height])
             self.objects_pybullet.append(object_id_start)
             
+    def reset_task(self, task: Task):
+        self.task = task
+        self.reset()
+
     def reset(self):
         kin_state = self.single_motion_gen.kinematics.get_state(self.single_motion_gen.get_retract_config().view(1, -1))
         link_poses = kin_state.link_poses
@@ -728,7 +736,7 @@ class DualArmEnv:
         return task_execution_result
 
     def motion_plan(self, task_plan: TaskPlan, pre_grasp:bool=True):
-        needs_naive_plan = True
+        needs_naive_plan = False
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
         else:
@@ -1019,6 +1027,8 @@ class DualArmEnv:
         task_plan.arm2_assigned_object = -1
         task_plan.arm1_to_start = False
         task_plan.arm2_to_start = False
+        for k in self.default_ee_pos:
+            self.default_ee_pos[k][2] -= 0.15 
         task_execution_result = self.motion_plan(task_plan, pre_grasp=False)
         return task_execution_result
 
