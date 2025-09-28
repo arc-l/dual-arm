@@ -1,5 +1,5 @@
 import curobo
-import os
+import os, json
 os.environ['CUROBO_TORCH_CUDA_GRAPH_RESET'] = '1'
 import random
 from itertools import permutations, product
@@ -11,6 +11,7 @@ import isaacsim
 from typing import List
 from omni.isaac.kit import SimulationApp
 import helper
+from helper import save_plan, load_plan 
 if __name__ == '__main__':
     if helper.HEADLESS:
         simulation_app = None
@@ -439,7 +440,9 @@ class IsaacSimDualArms(DualArmEnv):
         while self.simulation_app.is_running():
             self.world.step(render=True)
     
-    def play(self, recorded_plan):
+    def play(self, recorded_plan, reset_bullet=False):
+        if reset_bullet:
+            self.reset()
         self.get_ready(reset=True)
         for section in recorded_plan:
             if type(section) == list:
@@ -457,7 +460,20 @@ class IsaacSimDualArms(DualArmEnv):
     
 
 if __name__ == "__main__":
-    task = Task.read_from_json("data/random_objects_4.json")
+    start = json.load(open(f"data/icra/A.json"))['goals']
+    goal = json.load(open(f"data/icra/R.json"))['goals']
+    data = {
+        'starts': start,
+        'goals': goal,
+        'object_size': 0.045,
+        'map_width': 0.45,
+        'map_length': 0.45
+    }
+    with open("data/real_robot_experiment.json", 'w') as f:
+        json.dump(data, f, indent=4)
+    task = Task.read_from_json("data/real_robot_experiment.json")
     dual_arms_env = IsaacSimDualArms(task, simulation_app, headless=False, pure_curobo=False)
-    plan = dual_arms_env.plan()
-    dual_arms_env.play(plan)
+    # plan = dual_arms_env.plan()
+    # save_plan(plan, "real_robot_experiment.json", "ours")
+    plan = load_plan("results/real_robot_experiment_ours_plan.pkl", device='cuda:0')
+    dual_arms_env.play(plan, reset_bullet=True)
