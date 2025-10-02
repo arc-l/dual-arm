@@ -287,7 +287,8 @@ class DualArmEnv:
 
             # Add robot.
             self._pb.loadURDF("plane.urdf", [0, 0, -0.0005])
-            self.robot_id = self._pb.loadURDF("assets/ur5e/dual_ur5e_gripper.urdf", [0, 0, 0], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL, useFixedBase=True)
+            # self.robot_id = self._pb.loadURDF("assets/ur5e/dual_ur5e_gripper.urdf", [0, 0, 0], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL, useFixedBase=True)
+            self.robot_id = self._pb.loadURDF("assets/ur5e/spherized.urdf", [0, 0, 0], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL, useFixedBase=True)
             self.all_joint_info = [self._pb.getJointInfo(self.robot_id, i) for i in range(self._pb.getNumJoints(self.robot_id))]
             self.joint_ids_all_bullet = [info[0] for info in self.all_joint_info]
             # self.joint_ids_all_bullet = [j[0] for j in self.joint_ids_all_bullet if j[2] == pybullet.JOINT_REVOLUTE]
