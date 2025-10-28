@@ -1,6 +1,7 @@
 import os
 import copy
 import random
+import json
 os.environ['CUROBO_TORCH_CUDA_GRAPH_RESET'] = '1'
 from itertools import product
 from packaging import version
@@ -95,6 +96,7 @@ class DualArmEnv:
             load_yaml(join_path(get_world_configs_path(), "collision_table.yml"))
         )
         world_cfg_table.cuboid[0].pose[2] -= 0.02
+        self.table_cuboids = world_cfg_table.cuboid
         self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid)
         self.add_objects_curobo()
         obs = self.objects_curobo + world_cfg_table.cuboid
@@ -206,6 +208,7 @@ class DualArmEnv:
         # the current joint states. Used for headless planning
         self.current_js = JointState.from_position(self.tensor_args.to_device([self.default_config]), self.j_names)
         self.current_js = self.current_js.get_ordered_joint_state(self.j_names_primary)
+        self.problem_log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "dual_ur5e_problem_log.json")
 
         # pybullet
         if not self.headless:
@@ -1178,6 +1181,83 @@ class DualArmEnv:
         #TODO: add back the function to get the joint states from pybullet
         cu_js = self.current_js.get_ordered_joint_state(self.arm_joint_names)
         return cu_js
+
+    def _joint_state_to_list(self, joint_state: JointState) -> List[float]:
+        if joint_state is None:
+            return []
+        tensor = joint_state.position if isinstance(joint_state, JointState) else joint_state
+        if tensor is None:
+            return []
+        if isinstance(tensor, torch.Tensor):
+            return tensor.reshape(-1).detach().cpu().tolist()
+        if isinstance(tensor, np.ndarray):
+            return tensor.reshape(-1).tolist()
+        return list(tensor)
+
+    def _cuboid_to_box_entry(self, cuboid: Cuboid):
+        if cuboid is None:
+            return None
+        dims = getattr(cuboid, "dims", None)
+        pose = getattr(cuboid, "pose", None)
+        name = getattr(cuboid, "name", "object")
+        if dims is None or pose is None:
+            return None
+        half_extents = [float(val) / 2.0 for val in dims]
+        position = [float(val) for val in pose[:3]]
+        entry = {
+            "name": name,
+            "half_extents": half_extents,
+            "position": position,
+            "orientation_euler_xyz": [0.0, 0.0, 0.0],
+            "orientation_quat_xyzw": [0.0, 0.0, 0.0, 1.0],
+        }
+        return entry
+
+    def _build_box_entries(self) -> List[dict]:
+        boxes = []
+        for table in getattr(self, "table_cuboids", []):
+            entry = self._cuboid_to_box_entry(table)
+            if entry:
+                boxes.append(entry)
+        for obj in self.objects_curobo:
+            entry = self._cuboid_to_box_entry(obj)
+            if entry:
+                boxes.append(entry)
+        return boxes
+
+    def _append_problem_definition(self, label: str, start_state: JointState, goal_state: JointState) -> None:
+        start_list = self._joint_state_to_list(start_state)
+        goal_list = self._joint_state_to_list(goal_state)
+        if not start_list or not goal_list:
+            return
+        os.makedirs(os.path.dirname(self.problem_log_path), exist_ok=True)
+        data = {}
+        if os.path.exists(self.problem_log_path):
+            try:
+                with open(self.problem_log_path, "r") as file:
+                    data = json.load(file)
+            except (json.JSONDecodeError, OSError):
+                data = {}
+        data.setdefault("robot", "dual_ur5e")
+        joint_names = self.arm_joint_names if self.arm_joint_names else self.j_names_primary
+        data.setdefault("joints", joint_names)
+        problems = data.setdefault("problems", {})
+        scenario_name = "generated"
+        scenario = problems.setdefault(scenario_name, [])
+        entry = {
+            "sphere": [],
+            "cylinder": [],
+            "box_": [],
+            "box": self._build_box_entries(),
+            "index": len(scenario) + 1,
+            "problem": label,
+            "start": start_list,
+            "goals": [goal_list],
+            "valid": True
+        }
+        scenario.append(entry)
+        with open(self.problem_log_path, "w") as file:
+            json.dump(data, file, indent=2)
         
     def visualize_plan(self, plan: JointState):
         if plan is None:
@@ -1248,6 +1328,18 @@ class DualArmEnv:
                 # self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_goal.obj")
                 goal_ik_result = self.ik_solve_single(goal1, goal2, angle1, angle2)
                 self.restore_ik_solver()
+                start_ik = start_ik_result.js_solution
+                start_ik = start_ik.get_ordered_joint_state(self.arm_joint_names)
+                goal_ik = goal_ik_result.js_solution
+                goal_ik = goal_ik.get_ordered_joint_state(self.arm_joint_names)
+                print("Goal IK result:")
+                print(goal_ik.position.cpu().numpy())
+                print("Arm joints:", self.arm_joint_names)
+                curr_js = self.get_current_arm_js()
+                problem_prefix = f"obj_{indices[0]}_{indices[1]}_{angle1}_{angle2}"
+                self._append_problem_definition(f"{problem_prefix}_current_to_start", curr_js, start_ik)
+                self._append_problem_definition(f"{problem_prefix}_start_to_goal", start_ik, goal_ik)
+
                 # self.save_scene_as_mesh(self.ik_solver.world_coll_checker, "results/cubes_at_start.obj")
                 if start_ik_result.success and goal_ik_result.success:
                     # [start_pos, goal_pos, orientation]
