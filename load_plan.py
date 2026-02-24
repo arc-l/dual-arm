@@ -1,6 +1,4 @@
-import isaacsim
 from dual_arms import DualArmEnv
-from baseline_dual_arm import Baseline
 import argparse, os
 from curobo.types.state import JointState
 from helper import load_plan, compute_max_joint_speed
@@ -54,13 +52,7 @@ if __name__ == "__main__":
     
     task = Task.read_from_json(args.input)
     
-    if args.method == "baseline":
-        planner = Baseline(task, headless=False, display=True)
-    elif args.method == "baseline_with_our_tp":
-        planner = Baseline(task, headless=False, display=True)
-    else:
-        # Call our method
-        planner = DualArmEnv(task, headless=False, batch_size=3, constrain_grasp_approach=False)
+    planner = DualArmEnv(task, headless=False, batch_size=3, constrain_grasp_approach=False)
     
     # change the input json file's extension to .pkl
     # and change it to results folder from data folder
