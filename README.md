@@ -75,15 +75,7 @@ conda activate dual_arm_tamp
 This repository imports packages that are not installed by `environment.yml`, most notably:
 
 - `curobo`
-- `torch` (CUDA-enabled build recommended / likely required)
 
-It also relies on GPU acceleration and CuRobo robot/world configs (via `curobo.util_file.get_robot_configs_path()`).
-
-Placeholders to fill:
-- [ ] Exact PyTorch version
-- [ ] Exact CUDA version (the code checks for CUDA `>= 12.0` in `dual_arms.py`)
-- [ ] CuRobo installation instructions (pip / source / Isaac Sim compatible version)
-- [ ] Any system packages required for `pybullet` / `toppra`
 
 ### 3. (Optional) Baseline simulation environment
 There is an additional environment file at `baseline/simulation/requirements.yml` for parts of the baseline stack. If your baseline path requires extra packages, document the exact setup here.
