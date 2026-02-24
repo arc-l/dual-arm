@@ -4,6 +4,7 @@
 <a href="https://duozhangrobotics.github.io/" target="_blank"><nobr>Junshan Huang</nobr></a> &emsp;
 <a href="https://arc-l.github.io/group.html" target="_blank"><nobr>Jingjin Yu</nobr></a> &emsp; (Accepted to [ICRA 2026](https://2026.ieee-icra.org/))
 
+![Experimental setup](assets/setup.png)
 
 ## Table of Contents
 - [Introduction](#intro)
@@ -13,11 +14,7 @@
 - [Installation](#install)
 - [Usage](#usage)
   - [Run a Single Case](#single-case)
-  - [Run All Cases](#all-cases)
-  - [Evaluate Task Planner Only](#task-planner-only)
-  - [Visualize Aggregate Results](#visualize)
 - [Task JSON Format](#json-format)
-- [Repository Structure](#repo-structure)
 - [Citation](#citation)
 
 ## <a name="intro"></a>Introduction
@@ -72,13 +69,6 @@ Example methods:
 
 ```bash
 python evaluation.py --input data/cycled_objects_4.json --method our_tp_with_curobo
-```
-
-### <a name="task-planner-only"></a>Evaluate task planner only (action count)
-To compare only task-planner outputs (number of actions / action lists), use:
-
-```bash
-python evaluate_task_planner.py --input data/cycled_objects_4.json --method ours
 ```
 
 ## <a name="json-format"></a>Task JSON Format
