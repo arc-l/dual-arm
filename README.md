@@ -5,14 +5,6 @@
 <a href="https://arc-l.github.io/group.html" target="_blank"><nobr>Jingjin Yu</nobr></a> &emsp; (Accepted to [ICRA 2026](https://2026.ieee-icra.org/))
 
 
-<div align="center">
-<p float="left">
-  <img src="data_vis/cycled_objects_9.png" width="30%" />
-  <img src="data_vis/double_cycled_10.png" width="30%" />
-  <img src="data_vis/mixed_12.png" width="30%" />
-</p>
-</div>
-
 ## Table of Contents
 - [Introduction](#intro)
   - [What This Repository Does](#what)
@@ -71,20 +63,12 @@ conda env create -f environment.yml
 conda activate dual_arm_tamp
 ```
 
-### 2. Install external dependencies not captured in `environment.yml`
-This repository imports packages that are not installed by `environment.yml`, most notably:
-
-- `curobo`
-
-
-### 3. (Optional) Baseline simulation environment
-There is an additional environment file at `baseline/simulation/requirements.yml` for parts of the baseline stack. If your baseline path requires extra packages, document the exact setup here.
+https://github.com/DuoZhangRobotics/curobo_dual_ur5e
 
 ## <a name="usage"></a>Usage
 
 ### <a name="single-case"></a>Run a single case
 Run one method on one task JSON file:
-
 ```bash
 python evaluation.py --input data/cycled_objects_4.json --method ours
 ```
@@ -92,28 +76,7 @@ python evaluation.py --input data/cycled_objects_4.json --method ours
 Example methods:
 
 ```bash
-python evaluation.py --input data/cycled_objects_4.json --method baseline
-python evaluation.py --input data/cycled_objects_4.json --method baseline_with_our_tp
-python evaluation.py --input data/cycled_objects_4.json --method ours_with_baseline_tp
 python evaluation.py --input data/cycled_objects_4.json --method our_tp_with_curobo
-python evaluation.py --input data/cycled_objects_4.json --method baseline_tp_with_curobo
-```
-
-Notes:
-- `evaluation.py` creates `results/` outputs (e.g., timing stats for some methods).
-- GUI / headless behavior is configured inside `evaluation.py` and planner constructors.
-
-### <a name="all-cases"></a>Run all cases
-Run all JSON files in `data/` for a single method:
-
-```bash
-bash run.sh ours
-```
-
-Run the bundled two-pass script (`ours` then `baseline`):
-
-```bash
-bash run_all.sh
 ```
 
 ### <a name="task-planner-only"></a>Evaluate task planner only (action count)
@@ -121,26 +84,7 @@ To compare only task-planner outputs (number of actions / action lists), use:
 
 ```bash
 python evaluate_task_planner.py --input data/cycled_objects_4.json --method ours
-python evaluate_task_planner.py --input data/cycled_objects_4.json --method baseline
 ```
-
-Batch script:
-
-```bash
-bash run_all_task_plan.sh
-```
-
-### <a name="visualize"></a>Visualize aggregate results
-After populating `results/` (e.g., duration files), generate comparison plots:
-
-```bash
-python visualize_execution_time.py
-```
-
-This script saves plots such as:
-- `results/execution_time_comparison.png`
-- `results/success_rate_comparison.png`
-- `results/execution_time_ratios_boxplot.png`
 
 ## <a name="json-format"></a>Task JSON Format
 Tasks are loaded using `Task.read_from_json(...)` in `task.py`.
@@ -169,21 +113,6 @@ Example:
   "map_length": 0.6
 }
 ```
-
-## <a name="repo-structure"></a>Repository Structure
-
-- `dual_arms.py`: Main dual-arm environment and planning pipeline (CuRobo + PyBullet/TOPPRA integration).
-- `baseline_dual_arm.py`: Baseline wrapper and hybrid evaluation modes.
-- `evaluation.py`: Main experiment entry point for planner/method comparisons.
-- `evaluate_task_planner.py`: Task-planning-only comparison script.
-- `task.py`: Task representation, task generation, JSON IO, dependency graph logic.
-- `helper.py`: Plan serialization helpers and utility functions.
-- `run.sh`, `run_all.sh`, `run_all_task_plan.sh`: Batch evaluation scripts.
-- `visualize_execution_time.py`: Plotting utility for benchmark summaries.
-- `data/`: Task JSON files.
-- `data_vis/`: Dataset visualization images.
-- `baseline/`: Baseline task/motion planning implementations and benchmark data.
-- `assets/`: Robot assets (e.g., URDFs).
 
 ## <a name="citation"></a>Citation
 
