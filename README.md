@@ -6,10 +6,6 @@
 
 ![Experimental setup](assets/setup.png)
 
-<video src="assets/ICRA_dual_arm_video_submission_hd.mp4" controls muted playsinline width="100%"></video>
-
-[Download / open video](assets/ICRA_dual_arm_video_submission_hd.mp4)
-
 ## Table of Contents
 - [Introduction](#intro)
   - [What This Repository Does](#what)
