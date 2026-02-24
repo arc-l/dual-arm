@@ -8,7 +8,9 @@ import numpy as np
 import time
 from typing import List
 import torch
+
 def is_cuda_graph_reset_available():
+    # CuRobo's CUDA graph reset path requires both the env flag and CUDA >= 12.
     reset_cuda_graph = os.environ.get("CUROBO_TORCH_CUDA_GRAPH_RESET")
     if reset_cuda_graph is not None:
         if bool(int(reset_cuda_graph)):
@@ -58,6 +60,9 @@ class DualArmEnv:
                  num_buffers: int = 20,
                  pure_curobo: bool = False,
                  ):
+        # This environment couples:
+        # 1) CuRobo planning/collision state, and
+        # 2) optional PyBullet execution/simulation state.
         self.headless = headless
         self.task = task
         self.num_buffers = num_buffers
@@ -84,6 +89,7 @@ class DualArmEnv:
         for k, v in self.gripper_mimic_joints_settings.items():
             self.gripper_mimic_joint_names.extend(v["joint_names"])
         self.j_names = self.robot_cfg["kinematics"]["cspace"]["joint_names"]
+        # Exclude mimic joints so commanded trajectories only include independent DOFs.
         self.j_names_primary = [name for name in self.j_names if name not in self.gripper_mimic_joint_names]
         print("j_names_primary = ", self.j_names_primary)
         self.default_config = self.robot_cfg["kinematics"]["cspace"]["retract_config"]
@@ -96,6 +102,7 @@ class DualArmEnv:
         world_cfg_table.cuboid[0].pose[2] -= 0.02
         self.world_cfg = WorldConfig(cuboid=world_cfg_table.cuboid)
         self.add_objects_curobo()
+        # CuRobo sees the table + task objects as primitive cuboids.
         obs = self.objects_curobo + world_cfg_table.cuboid
         # self.world_cfg_curobo = WorldConfig(cuboid=obs, mesh=world_cfg1.mesh)
         self.world_cfg_curobo = WorldConfig(cuboid=obs)
@@ -154,6 +161,7 @@ class DualArmEnv:
         # self.motion_gen.warmup(enable_graph=True, warmup_js_trajopt=False, batch=65)
         self.ee_link_names = self.single_motion_gen.kinematics.link_names
         self.arm1 = self.single_motion_gen.kinematics.ee_link
+        # The second end effector is the remaining link in the kinematics set.
         self.arm2 = [link for link in self.ee_link_names if link != self.arm1][0]
         print(f"End effector link names: {self.ee_link_names}")
         self.grid_range = 0.2
@@ -235,6 +243,7 @@ class DualArmEnv:
 
     
     def add_objects_curobo(self):
+        # Create CuRobo cuboids for each movable object at the task start poses.
         starts = self.task.get_starts()
         colors = self.task.get_colors()
         for i in range(self.task.num_objects):
@@ -248,6 +257,7 @@ class DualArmEnv:
             self.objects_curobo.append(cube)
     
     def add_objects_pybullet(self):
+        # Spawn physical cubes and translucent goal markers in PyBullet.
         starts = self.task.get_starts()
         goals = self.task.get_goals()
         colors = self.task.get_colors()
@@ -263,6 +273,8 @@ class DualArmEnv:
             self.objects_pybullet.append(object_id_start)
             
     def reset(self):
+        # Reinitialize robot/object state and rebuild IDs/caches that depend on the
+        # current simulator instance. Headless mode still refreshes planning state.
         kin_state = self.single_motion_gen.kinematics.get_state(self.single_motion_gen.get_retract_config().view(1, -1))
         link_poses = kin_state.link_poses
         self.default_ee_pos = {}
@@ -319,6 +331,8 @@ class DualArmEnv:
                     self.ee_name_to_id[self.arm2] = i
             self.gripper_mimic_joints_id_dict = {}
             for gripper_primary_name, settings in self.gripper_mimic_joints_settings.items():
+                # Precompute mimic-joint mappings so `gripper_update()` can mirror
+                # primary joint motion onto mechanically coupled joints.
                 gripper_primary_id = self.j_names_to_id[gripper_primary_name]
                 self.gripper_mimic_joints_id_dict[gripper_primary_id] = {}
                 for i in range(len(settings["joint_names"])):
@@ -394,6 +408,8 @@ class DualArmEnv:
             time.sleep(self.interpolation_dt)
 
     def gripper_update(self):
+        # PyBullet is not enforcing the mimic constraints for this gripper model,
+        # so copy the primary joint angle to each mimic joint every sim step.
         target_joint_states = []
         target_joint_ids = []
         for gripper_primary_id, gripper_mimic_joints in self.gripper_mimic_joints_id_dict.items(): 
@@ -416,6 +432,8 @@ class DualArmEnv:
         return dist 
         
     def gripper_control(self, gripper1_action: GripperAction, gripper2_action: GripperAction):
+        # High-level open/close command. In sim mode this blocks until both
+        # grippers stop moving or a grasp attachment is created.
         target_velocities = [
             self.max_velocity if gripper1_action==GripperAction.CLOSE else -self.max_velocity,
             self.max_velocity if gripper2_action==GripperAction.CLOSE else -self.max_velocity
@@ -450,7 +468,8 @@ class DualArmEnv:
                     obj = self.check_contact(self.arm1)
                     if obj is not None:
                         target_velocities[0] = 0
-                        # create fixed constraint
+                        # Attach the grasped object to the end effector so it moves
+                        # rigidly with the arm after contact.
                         pos, orn = self._pb.getLinkState(self.robot_id, self.ee_name_to_id[self.arm1])[:2]
                         obj_pos, obj_orn = self._pb.getBasePositionAndOrientation(obj)
                         parent_frame_pos, parent_frame_orn = self._pb.multiplyTransforms(
@@ -481,7 +500,7 @@ class DualArmEnv:
                     obj = self.check_contact(self.arm2)
                     if obj is not None:
                         target_velocities[1] = 0
-                        # create fixed constraint
+                        # Same rigid attachment logic for arm2.
                         pos, orn = self._pb.getLinkState(self.robot_id, self.ee_name_to_id[self.arm2])[:2]
                         obj_pos, obj_orn = self._pb.getBasePositionAndOrientation(obj)
                         parent_frame_pos, parent_frame_orn = self._pb.multiplyTransforms(
@@ -586,6 +605,8 @@ class DualArmEnv:
     
     @staticmethod
     def get_pose_grid(n_x, n_y, n_z, max_x, max_y, max_z):
+        # Cartesian offset grid used to perturb one arm while keeping the other at
+        # its nominal grasp pose during paired IK search.
         x = np.linspace(-max_x, max_x, n_x)
         y = np.linspace(-max_y, max_y, n_y)
         z = np.linspace(0, max_z, n_z)
@@ -600,6 +621,8 @@ class DualArmEnv:
         return position_arr
     
     def ik_solve_batch(self, ik_goal1, ik_goal2):
+        # Batched dual-arm IK: arm1 is the primary goal, arm2 is constrained via
+        # `link_poses` for the second end effector.
         link_poses = {}
         link_poses[self.arm2] = ik_goal2
         current_pose = self.get_current_arm_js().position.view(1, -1) # shape: 1 x dof
@@ -618,6 +641,8 @@ class DualArmEnv:
         return ik_results
     
     def get_grid_goal_poses(self, c_p1, c_p2, angle1=900, angle2=900, prioritize_arm1=True):
+        # Build repeated goal poses and add local offsets to one arm so we can
+        # search nearby Cartesian samples without rebuilding pose objects.
         c_rot1 = self.gripper_grasp_orientations[self.arm1][angle1]
         c_rot2 = self.gripper_grasp_orientations[self.arm2][angle2]
         position_offsets = self.tensor_args.to_device(self.get_pose_grid(self.grid_num, self.grid_num, self.grid_num, self.grid_range, self.grid_range, self.grid_range*2))
@@ -638,6 +663,7 @@ class DualArmEnv:
         return ik_goal1, ik_goal2
 
     def ik_solve_single(self, c_p1:np.ndarray, c_p2:np.ndarray|None, arm_angle1=900, arm_angle2:float|None=900, num_solutions=1):
+        # Solve IK for arm1 while optionally constraining arm2 to a target pose.
         c_rot = self.gripper_grasp_orientations[self.arm1][arm_angle1]
         ik_goal = Pose(
             position=self.tensor_args.to_device(c_p1),
@@ -667,6 +693,7 @@ class DualArmEnv:
 
 
     def plan_single_from_curr_js(self, goal_arm1, goal_arm2, arm_angle1, arm_angle2):
+        # Plan a synchronized dual-arm motion from the current joint state.
         cu_js = self.get_current_arm_js()
         link_poses = {}
 
@@ -729,6 +756,9 @@ class DualArmEnv:
         return task_execution_result
 
     def motion_plan(self, task_plan: TaskPlan):
+        # Motion execution for one symbolic task step:
+        # move to pre-grasp, perform grasp/release, then retreat. Several fallbacks
+        # are used if direct dual-arm planning fails.
         needs_naive_plan = False
         if task_plan.arm1_assigned_object == -1 or task_plan.arm1_assigned_object is None:
             goal_arm1 = self.default_ee_pos[self.arm1].copy()
@@ -739,7 +769,7 @@ class DualArmEnv:
         else:
             goal_arm2 = self.task.get_start( task_plan.arm2_assigned_object ).copy() if task_plan.arm2_to_start else self.task.get_goal( task_plan.arm2_assigned_object ).copy()
         
-        # safety pre_grasp
+        # Approach from above first to reduce collisions with the table/objects.
         goal_arm1[2] += self.pre_grasp_height
         goal_arm2[2] += self.pre_grasp_height
 
@@ -750,6 +780,7 @@ class DualArmEnv:
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
             if not result.success:
                 print("Failed to go to start position, using naive waypoints")
+                # In pure CuRobo mode, skip heuristic Cartesian detours entirely.
                 needs_naive_plan = True if not self.pure_curobo else False 
                 self.check_object_collision_enabled()
                 if self.pure_curobo:
@@ -763,6 +794,7 @@ class DualArmEnv:
                 self.go_down_go_up(task_plan)
 
         if needs_naive_plan:
+            # Heuristic Cartesian separation before retrying the planner.
             valid = self.naive_motion_plan(task_plan)
             result = self.plan_single_from_curr_js(goal_arm1=goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
             if result.success:
@@ -772,8 +804,8 @@ class DualArmEnv:
                 self.add_plan_to_record(cmd_plan)
                 self.go_down_go_up(task_plan)
             else:
-                # one arm by one arm
-                # if the arms are going to the start positions, recalculate the angles since if we do it with one are, there might be simpler solutions
+                # Final fallback: execute sequentially. Recompute single-arm grasp
+                # angles because an orientation that failed jointly may succeed alone.
                 arm1_angle = copy.deepcopy(task_plan.arm1_angle)
                 arm2_angle = copy.deepcopy(task_plan.arm2_angle)
                 arm1_assigned_object = copy.deepcopy( task_plan.arm1_assigned_object)
@@ -783,10 +815,11 @@ class DualArmEnv:
                     self.find_angle_for_single_arm(task_plan, self.arm2)
                     arm2_angle = task_plan.arm2_angle
 
-                #TODO: Check the order of the arms. If arm1's goal is dependent on arm2's goal, then we can't move arm1 first and vice versa.
+                # TODO: This ordering is heuristic; task dependencies should decide
+                # which arm moves first when goals block each other.
                 tmp_goal_arm1 = self.default_ee_pos[self.arm1]
                 tmp_goal_arm2 = self.default_ee_pos[self.arm2]
-                # move arm2 to goal, arm1 to retract pose
+                # Move arm2 while parking arm1 at the retract pose.
                 result = self.plan_single_from_curr_js(goal_arm1=tmp_goal_arm1, goal_arm2=goal_arm2, arm_angle1=task_plan.arm1_angle, arm_angle2=task_plan.arm2_angle)
                 cmd_plan = self.get_plan_single(result)
                 cmd_plan = self.toppra_improvement(cmd_plan, speed_scale=0.5, acc_scale=1)
@@ -809,7 +842,7 @@ class DualArmEnv:
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
 
-                # move the other arm
+                # Then move arm1 while keeping arm2 parked.
                 if task_plan.arm1_to_start:
                     task_plan.arm2_assigned_object = None
                     task_plan.arm1_assigned_object = arm1_assigned_object
@@ -846,6 +879,9 @@ class DualArmEnv:
         return task_execution_result
     
     def naive_motion_plan(self, task_plan):
+        # Cartesian fallback to manually create clearance between the two arms.
+        # This does not replace the planner; it creates a better starting point
+        # before trying a CuRobo plan again.
         new_angle1 = task_plan.arm1_angle
         new_angle2 = task_plan.arm2_angle
         ee_pos = self.get_current_ee_pos()
@@ -881,7 +917,7 @@ class DualArmEnv:
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
 
-        # check left and right on the y-axis
+        # If the arms are close in x and nearly aligned in y, separate them laterally.
         if 0 < pos2[0] - pos1[0] < 0.2:
             if 0 < pos1[1] - pos2[1] < 0.1:
                 # arm1 on the left, separate them
@@ -905,7 +941,7 @@ class DualArmEnv:
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
             
-        # move back a little bit to seperate them on x-axis
+        # Increase x-axis clearance if the two wrists are too close.
         if pos2[0] - pos1[0] < 0.3:
             delta_x = 0.3
             pos1[0] = max(pos1[0]-delta_x, -0.3)
@@ -916,7 +952,7 @@ class DualArmEnv:
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
         
-        # align with the goal on the y-axis
+        # After creating clearance, align with the target lane(s) before the retry.
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
@@ -978,6 +1014,8 @@ class DualArmEnv:
         return True
     
     def filter_task_plans(self, task_plan: TaskPlan):
+        # Enrich/repair a symbolic task plan with concrete arm assignments, grasp
+        # angles, and optional buffers that pass IK feasibility checks.
         start = time.time()
         if task_plan.start_goal_pairs is not None and not task_plan.use_buffer:
             print("Pick two from the start_goal_pairs")
@@ -1008,6 +1046,8 @@ class DualArmEnv:
         return self.filter_task_plans(task_plan)
 
     def plan(self):
+        # Full loop: symbolic planning -> motion planning/execution -> world sync ->
+        # task-state update until all objects reach their goals.
         self.reset()
         self.time_stats = {}
         overall_start_time = time.time()
@@ -1040,7 +1080,7 @@ class DualArmEnv:
                 sync_before_close = True
             
             if sync_before_close:
-                # self.sync_isaacsim_curobo(idx_to_sync=idx_to_sync)
+                # Sync object poses before CuRobo "attaches" them to the robot.
                 self.sync_isaacsim_curobo()
 
             idx_to_sync = list(range(self.task.num_objects))
@@ -1061,7 +1101,8 @@ class DualArmEnv:
                 self.detach_obj(cube_name=self.objects_curobo[task_plan.arm2_assigned_object].name, arm_name=self.arm2)
 
             if sync_after_open:
-                # self.sync_isaacsim_curobo(idx_to_sync=idx_to_sync)
+                # Sync again after releasing objects so the world collision model
+                # matches the simulator/task state.
                 self.sync_isaacsim_curobo()
 
             self.check_object_collision_enabled()
@@ -1133,6 +1174,7 @@ class DualArmEnv:
             print("Empty JointState plan.")
             return
         cu_js = plan[-1].get_ordered_joint_state(self.j_names_primary)
+        # In headless mode, storing the last state is how we "advance" execution.
         self.current_js = JointState.from_position(self.tensor_args.to_device(cu_js.position.reshape(1, -1)), self.j_names_primary)
         if self.headless:
             return 
@@ -1182,7 +1224,10 @@ class DualArmEnv:
         self.ik_solver.update_world(self.world_cfg_curobo)
 
     def find_available_task(self, task_plan: TaskPlan):
-        # first, find the avaiable task that uses vertical pick and place
+        # Search order:
+        # 1) preferred vertical grasps for both arms,
+        # 2) broader angle set for both arms,
+        # 3) one-arm-at-a-time feasibility.
         print("finding vertical pick and place")
         for combo in self.preferred_angles_combination:
             for indices in task_plan.start_goal_pairs:
@@ -1249,6 +1294,9 @@ class DualArmEnv:
         
 
     def find_available_task_with_buffers(self, task_plan: TaskPlan):
+        # When two goals conflict, route one object through a temporary buffer.
+        # We sample buffers, batch-check IK, then choose the buffer with the best
+        # clearance from all current objects.
         buffers = self.task.sample_buffers(self.num_buffers)
         for combo in self.preferred_angles_combination:
             for indices in task_plan.start_goal_pairs:
@@ -1324,6 +1372,8 @@ class DualArmEnv:
                 return 
                 
     def find_angle_for_single_arm(self, task_plan: TaskPlan, arm: str, other_angle: float|None=None):
+        # Find a grasp angle for one arm while the other arm angle is fixed (or
+        # defaulted), requiring both the start and goal poses to be IK-feasible.
         if arm == self.arm1:
             for angle in self.all_angles:
                 start1 = self.default_ee_pos[self.arm1]
@@ -1390,6 +1440,7 @@ class DualArmEnv:
     
         
     def get_plan_single(self, result: MotionGenResult):
+        # Normalize the planner output to the expected joint ordering.
         cmd_plan = result.get_interpolated_plan()
         cmd_plan = self.single_motion_gen.get_full_js(cmd_plan)
         if self.headless:
@@ -1547,6 +1598,8 @@ class DualArmEnv:
         return cube_positions 
 
     def sync_isaacsim_curobo(self, idx_to_sync: list = None):
+        # Update CuRobo's world objects from PyBullet (or headless task state) and
+        # keep `Task` start poses in sync with the same source of truth.
         if idx_to_sync is None:
             idx_to_sync = list(range(self.task.num_objects))
         new_starts = {}
@@ -1631,6 +1684,7 @@ class DualArmEnv:
         )
     
     def traj_collision_check(self, traj: JointState):
+        # Batch collision query for the full trajectory in RobotWorld.
         traj = traj.get_ordered_joint_state(self.arm_joint_names)
         positions = traj.position
         positions = positions.unsqueeze(0)
@@ -1643,6 +1697,7 @@ class DualArmEnv:
         return valid
 
     def go_down_go_up(self, task_plan: TaskPlan):
+        # Shared pick/place micro-sequence executed around a pre-grasp waypoint.
         # go down
         arm1_delta_z = -self.pre_grasp_height if task_plan.arm1_assigned_object not in [None, -1] else 0
         arm2_delta_z = -self.pre_grasp_height if task_plan.arm2_assigned_object not in [None, -1] else 0
@@ -1659,6 +1714,8 @@ class DualArmEnv:
         self.add_plan_to_record(cmd_plan)
         
     def move_ee(self, pos1, angle1, pos2, angle2):
+        # Convenience move used by the heuristic fallback:
+        # solve IK, interpolate in joint space, then collision-check the path.
         ik_result = self.ik_solve_single(pos1, pos2, angle1, angle2, num_solutions=1)
         curr_js = self.get_current_arm_js()
         curr_js = self.single_motion_gen.get_full_js(curr_js)
@@ -1674,6 +1731,7 @@ class DualArmEnv:
         return cmd_plan, valid
     
     def move_z(self, delta, angle1, angle2):
+        # Symmetric z translation for both end effectors.
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
@@ -1682,6 +1740,7 @@ class DualArmEnv:
         return self.move_ee(pos1, angle1, pos2, angle2)
     
     def move_z_2(self, delta1, delta2, angle1, angle2):
+        # Independent z translation for each arm.
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
@@ -1690,6 +1749,7 @@ class DualArmEnv:
         return self.move_ee(pos1, angle1, pos2, angle2)
     
     def move_x(self, delta, angle1, angle2):
+        # Mirror x offsets so the two arms move apart/toward each other together.
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
@@ -1698,6 +1758,7 @@ class DualArmEnv:
         return self.move_ee(pos1, angle1, pos2, angle2)
     
     def move_y(self, delta, angle1, angle2):
+        # Mirror y offsets to preserve dual-arm symmetry.
         ee_pos = self.get_current_ee_pos()
         pos1 = ee_pos[self.arm1]
         pos2 = ee_pos[self.arm2]
@@ -1752,6 +1813,7 @@ class DualArmEnv:
         self.display(reset=False)
     
     def toppra_improvement(self, traj: JointState, speed_scale=0.5, acc_scale=1.0):
+        # Re-time a joint path subject to velocity and acceleration limits.
         waypoints_ = traj.position.cpu().numpy()
         joint_names = traj.joint_names
         max_accelerations = np.array([[-40.0*acc_scale, 40.0*acc_scale]]*traj[0].shape[0])
@@ -1771,6 +1833,7 @@ class DualArmEnv:
         return traj
     
     def play(self, recorded_plan):
+        # Replay a recorded sequence containing both trajectories and gripper actions.
         self.reset()
         for section in recorded_plan:
             if type(section) == list:
@@ -1779,6 +1842,7 @@ class DualArmEnv:
                 self.visualize_plan(section)
 
     def add_plan_to_record(self, cmd_plan:JointState|List):
+        # Store either a JointState trajectory or a [gripper_action1, gripper_action2] marker.
         if isinstance(cmd_plan, list):
             self.recorded_plan.append(cmd_plan)
         else:
