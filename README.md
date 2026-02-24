@@ -43,18 +43,6 @@ The codebase appears to compare task-planning and motion-planning combinations (
 
 These names correspond to different combinations of task planning (TP) and motion planning (MP) components. If you are preparing a paper release, this is a good place to add a short mapping from method names to algorithm descriptions.
 
-### <a name="examples"></a>Dataset / Task Examples
-The repository includes pre-generated task JSON files in `data/` and visualization images in `data_vis/`.
-
-<div align="center">
-<p float="left">
-  <img src="data_vis/random_objects_8.png" width="22%" />
-  <img src="data_vis/cycled_objects_8.png" width="22%" />
-  <img src="data_vis/double_cycled_8.png" width="22%" />
-  <img src="data_vis/mixed_8.png" width="22%" />
-</p>
-</div>
-
 ## <a name="install"></a>Installation
 
 ### 1. Create the conda environment
@@ -63,7 +51,14 @@ conda env create -f environment.yml
 conda activate dual_arm_tamp
 ```
 
+### 2. Install CuRobo from the following repo 
+
+Please use the CuRobo repo provided by the author for this project:
+
 https://github.com/DuoZhangRobotics/curobo_dual_ur5e
+
+Reason: the official CuRobo repo had bugs when attaching objects in a multi-arm system.  
+Reference issue: https://github.com/NVlabs/curobo/issues/553
 
 ## <a name="usage"></a>Usage
 
