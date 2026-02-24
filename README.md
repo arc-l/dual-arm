@@ -6,11 +6,14 @@
 
 ![Experimental setup](assets/setup.png)
 
+<video src="assets/ICRA_dual_arm_video_submission_hd.mp4" controls muted playsinline width="100%"></video>
+
+[Download / open video](assets/ICRA_dual_arm_video_submission_hd.mp4)
+
 ## Table of Contents
 - [Introduction](#intro)
   - [What This Repository Does](#what)
   - [Methods and Variants](#methods)
-  - [Dataset / Task Examples](#examples)
 - [Installation](#install)
 - [Usage](#usage)
   - [Run a Single Case](#single-case)
@@ -19,26 +22,24 @@
 
 ## <a name="intro"></a>Introduction
 ### <a name="what"></a>What this repository does
-This repository implements a dual-arm task and motion planning (TAMP) pipeline for object rearrangement on a tabletop. It includes:
+This repository implements the **Synchronous Dual-Arm Rearrangement Planner (SDAR)** from the paper, a dual-arm task-and-motion-planning (TAMP) framework for dense tabletop object rearrangement with two robot arms and 2-finger grippers. SDAR tightly couples:
+
+- **SDAR-T**: a dependency-driven dual-arm task planner that decomposes rearrangement problems using a dependency graph (independent objects, chains, and cycles) and produces high-quality next-step sub-task candidates.
+- **SDAR-M**: a synchronous dual-arm motion planner that samples grasp poses / sub-task instantiations, uses GPU-accelerated CuRobo IK + motion generation, and applies layered fallback recovery when optimized synchronous motion is not available.
+
+This codebase includes:
 
 - A dual-arm planner (`dual_arms.py`) using CuRobo-based motion planning.
-- A baseline rearrangement pipeline (`baseline_dual_arm.py` + `baseline/`).
 - Benchmark scripts for evaluating multiple planner combinations on generated task instances.
 - Utilities for generating task instances and visualizing results.
 
-The codebase appears to compare task-planning and motion-planning combinations (e.g., "ours", baseline, and hybrid variants) across synthetic rearrangement datasets such as `random`, `cycled`, `double_cycled`, and `mixed`.
+The evaluation setup covers synthetic tabletop rearrangement instances with strongly entangled start/goal configurations, including categories such as `random`, `cycled`, `double_cycled`, and `mixed` (corresponding to dependency-graph structures discussed in the paper).
 
 ### <a name="methods"></a>Methods and variants
 `evaluation.py` currently supports the following methods:
 
-- `ours`
-- `baseline`
-- `baseline_with_our_tp`
-- `ours_with_baseline_tp`
-- `our_tp_with_curobo`
-- `baseline_tp_with_curobo`
-
-These names correspond to different combinations of task planning (TP) and motion planning (MP) components. If you are preparing a paper release, this is a good place to add a short mapping from method names to algorithm descriptions.
+- `ours` (full **SDAR**: dependency-driven dual-arm task planning + synchronous dual-arm motion planning with fallback recovery)
+- `our_tp_with_curobo` (uses **SDAR-T** task planning with a CuRobo-based motion-planning pipeline)
 
 ## <a name="install"></a>Installation
 
@@ -60,12 +61,12 @@ Reference issue: https://github.com/NVlabs/curobo/issues/553
 ## <a name="usage"></a>Usage
 
 ### <a name="single-case"></a>Run a single case
-Run one method on one task JSON file:
+Run one method on one tabletop rearrangement task JSON file:
 ```bash
 python evaluation.py --input data/cycled_objects_4.json --method ours
 ```
 
-Example methods:
+Example (`our_tp_with_curobo` ablation-style variant):
 
 ```bash
 python evaluation.py --input data/cycled_objects_4.json --method our_tp_with_curobo
