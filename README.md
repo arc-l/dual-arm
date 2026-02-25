@@ -1,4 +1,4 @@
-# High-Performance Dual-Arm Task and Motion Planning for Tabletop Rearrangement [![Paper](https://img.shields.io/badge/SDAR-Arxiv-blue)](https://arxiv.org/pdf/2512.08206) [![Video](https://img.shields.io/badge/Video-TBD-red)](#citation)
+# High-Performance Dual-Arm Task and Motion Planning for Tabletop Rearrangement [![Paper](https://img.shields.io/badge/SDAR-Arxiv-blue)](https://arxiv.org/pdf/2512.08206) [![ProjectPage](https://img.shields.io/badge/ProjectPage-red)](https://duozhangrobotics.github.io/projects/dual-arm-icra-2026/)
 
 <a href="https://duozhangrobotics.github.io/" target="_blank"><nobr>Duo Zhang</nobr></a> &emsp;
 <a href="https://junshanhuang.com/" target="_blank"><nobr>Junshan Huang</nobr></a> &emsp;
