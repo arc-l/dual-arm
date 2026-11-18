@@ -891,8 +891,9 @@ class DualArmEnv:
                         pos2[1] = max(pos2[1] - 0.3, -0.3)
                 
                 cmd_plan, valid = self.move_ee(pos1, self.old_task_plan.arm1_angle, pos2, self.old_task_plan.arm2_angle)
-                if not valid:
-                    return False
+                # Patch (pRRTC async-TAMP baseline): execute every naive step as SDAR's June code did;
+                # real_robot returned here when a step failed traj_collision_check, which left arms that
+                # start in contact unable to separate (random_objects_16) and SDAR then crashed.
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
 
@@ -904,8 +905,6 @@ class DualArmEnv:
                 pos1[1] = min(pos1[1] + delta_y, 0.3)
                 pos2[1] = max(pos2[1] - delta_y, -0.3)
                 cmd_plan, valid = self.move_ee(pos1, angle1, pos2, angle2)
-                if not valid:
-                    return False
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
                 # cmd_plan_total = cmd_plan_total.stack(cmd_plan)
@@ -915,8 +914,6 @@ class DualArmEnv:
                 pos1[1] = max(pos1[1] - delta_y, -0.3)
                 pos2[1] = min(pos2[1] + delta_y, 0.3)
                 cmd_plan, valid = self.move_ee(pos1, angle1, pos2, angle2)
-                if not valid:
-                    return False
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
             
@@ -926,8 +923,6 @@ class DualArmEnv:
             pos1[0] = max(pos1[0]-delta_x, -0.3)
             pos2[0] = min(pos1[0]+delta_x, 0.3)
             cmd_plan, valid = self.move_ee(pos1, angle1, pos2, angle2)
-            if not valid:
-                return False
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
         
@@ -960,8 +955,6 @@ class DualArmEnv:
 
             if not (new_angle1 == old_angle1 and new_angle2 == old_angle2):
                 cmd_plan, valid = self.move_ee(pos1, new_angle1, pos2, new_angle2)
-                if not valid:
-                    return False
                 self.visualize_plan(cmd_plan)
                 self.add_plan_to_record(cmd_plan)
             
@@ -976,8 +969,6 @@ class DualArmEnv:
                 pos2[1] = goal_arm2[1]
             
             cmd_plan, valid = self.move_ee(pos1, new_angle1, pos2, new_angle2)
-            if not valid:
-                return False
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
 
@@ -986,8 +977,6 @@ class DualArmEnv:
             pos2[1] = goal_arm2[1]
 
             cmd_plan, valid = self.move_ee(pos1, new_angle1, pos2, new_angle2)
-            if not valid:
-                return False
             self.visualize_plan(cmd_plan)
             self.add_plan_to_record(cmd_plan)
         return True
@@ -1751,10 +1740,17 @@ class DualArmEnv:
     
     def toppra_improvement(self, traj: JointState, speed_scale=0.5, acc_scale=1.0):
         waypoints_ = traj.position.cpu().numpy()
+        # Patch (pRRTC async-TAMP baseline): drop consecutive repeated waypoints. cuRobo pads some
+        # trajectories with identical rows; TOPPRA's seidel solver then returns a degenerate timing
+        # (e.g. 48.5 s instead of 1.0 s) whose trajectory leaves the path by ~0.3 rad.
+        distinct = np.r_[True, np.abs(np.diff(waypoints_, axis=0)).max(axis=1) > 1e-9]
+        waypoints_ = waypoints_[distinct]
+        if waypoints_.shape[0] < 2:
+            return traj
         joint_names = traj.joint_names
         max_accelerations = np.array([[-40.0*acc_scale, 40.0*acc_scale]]*traj[0].shape[0])
         max_velocities = np.array([[-np.pi * speed_scale, np.pi * speed_scale]]*traj[0].shape[0])
-        path = ta.SplineInterpolator(np.linspace(0, 1, traj.shape[0]), waypoints_)
+        path = ta.SplineInterpolator(np.linspace(0, 1, waypoints_.shape[0]), waypoints_)
         pc_vel = constraint.JointVelocityConstraint(max_velocities)
         pc_acc = constraint.JointAccelerationConstraint(max_accelerations)
         instance = algo.TOPPRA([pc_vel, pc_acc], path, solver_wrapper='seidel')

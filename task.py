@@ -832,35 +832,9 @@ class Task:
                 return task_plan
 
             start_goal_pairs = []
-            if len(self.dependency_graph.independent_sets) > 1 or self.dependency_graph.has_chains():
-                if len(self.dependency_graph.independent_sets) > 1:
-                    # pick two independent sets
-                    print("Pick two independent sets.")
-                    idx_to_be_rearranged = self.dependency_graph.independent_sets
-                    start_goal_pairs += list(permutations(idx_to_be_rearranged, 2))
-                    # random.shuffle(start_goal_pairs)
-                
-                if self.dependency_graph.has_chains():
-                    # pick one chain
-                    print("Pick one chain.")
-                    chain = self.dependency_graph.get_chains()[0]
-                    print("chain: ", chain)
-                    assert len(chain) > 1, "Chain has to have more than one object"
-                    start_goal_pairs += [(chain[-1], chain[-2]), (chain[-2], chain[-1])]
-
-                # sort the start and the goal pairs based on the sum of the start-start distance and the goal-goal distance
-                start_goal_pairs.sort(key=lambda x: np.linalg.norm(self.start_dict[x[0]] - self.start_dict[x[1]]) + np.linalg.norm(self.goal_dict[x[0]] - self.goal_dict[x[1]]))
-                task_plan = TaskPlan(
-                    arm1_gripper_action=GripperAction.CLOSE,
-                    arm2_gripper_action=GripperAction.CLOSE,
-                    start_goal_pairs=start_goal_pairs,
-                    arm1_to_start=True,
-                    arm2_to_start=True,
-                    arm1_assigned_object=None,
-                    arm2_assigned_object=None
-                    )
-                return task_plan
-                
+            # Patch (pRRTC async-TAMP baseline): break every cycle before taking chains or independent
+            # pairs. Taking the chain left after breaking one cycle, while a coupled cycle still blocks a
+            # chain cube's goal, placed that cube onto the other cycle's cube (double_cycled_11).
             if self.dependency_graph.has_cycles():
                 # pick one cycle
                 print("Pick one cycle to break")
@@ -909,6 +883,35 @@ class Task:
                             use_buffer=True
                         )
                         return task_plan
+
+            if len(self.dependency_graph.independent_sets) > 1 or self.dependency_graph.has_chains():
+                if len(self.dependency_graph.independent_sets) > 1:
+                    # pick two independent sets
+                    print("Pick two independent sets.")
+                    idx_to_be_rearranged = self.dependency_graph.independent_sets
+                    start_goal_pairs += list(permutations(idx_to_be_rearranged, 2))
+                    # random.shuffle(start_goal_pairs)
+                
+                if self.dependency_graph.has_chains():
+                    # pick one chain
+                    print("Pick one chain.")
+                    chain = self.dependency_graph.get_chains()[0]
+                    print("chain: ", chain)
+                    assert len(chain) > 1, "Chain has to have more than one object"
+                    start_goal_pairs += [(chain[-1], chain[-2]), (chain[-2], chain[-1])]
+
+                # sort the start and the goal pairs based on the sum of the start-start distance and the goal-goal distance
+                start_goal_pairs.sort(key=lambda x: np.linalg.norm(self.start_dict[x[0]] - self.start_dict[x[1]]) + np.linalg.norm(self.goal_dict[x[0]] - self.goal_dict[x[1]]))
+                task_plan = TaskPlan(
+                    arm1_gripper_action=GripperAction.CLOSE,
+                    arm2_gripper_action=GripperAction.CLOSE,
+                    start_goal_pairs=start_goal_pairs,
+                    arm1_to_start=True,
+                    arm2_to_start=True,
+                    arm1_assigned_object=None,
+                    arm2_assigned_object=None
+                    )
+                return task_plan
 
 
         elif self.all_arms_busy():
